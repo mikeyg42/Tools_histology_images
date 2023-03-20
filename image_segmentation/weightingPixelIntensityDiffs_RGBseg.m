@@ -1,14 +1,17 @@
 function outOfBoundsMask = weightingPixelIntensityDiffs_RGBseg(rgbIMG)
-% This function makes great use of the efficient segmentation
-% that is possible with "graydiffweight" function in the context of a
-% homogenous background. 
+% syntax: outOfBoundsMask = weightingPixelIntensityDiffs_RGBseg(rgbIMG)
+% input : any RGB image. Cannot be grayscale/binary
+% procedures: This function makes use of the efficient segmentation
+% that is possible with color images on a white background, using color differences
+% calculated by treating the vector describing a pixel's intensity as a euclidean vector.
 
 % This function twice compares the intensity values of every 
-% pixel to some reference value. Once using gray intensitys, once merging colors
-% Using these weighted differences as the new intensity values for each pixel 
-% makes seperating the fairly homogenous white flat background easy.  
+% pixel to a reference value: once using gray intensity via the function graydiffweight,
+% and then later we compare to an arbitrary patch sampled from the middle 360 pixels 
+% each pixels color tristimulus and the average of that patch (using euclidean norm).
+% we can use otsu's method to thresh the bimodal distance maps.
 
-% With images of approximate size = 5000x5000x3, this function runs in ~7.5 seconds 
+% (images of approx dimensions 5000x5000x3 segment in under 8 seconds) 
 
 % Michael Glendinning 2023
 
@@ -47,9 +50,9 @@ avgColor = permute(mean(randomROI, [1 2]), [1, 3, 2]);
 % Compute the Euclidean distance between all rows of image and our avgColor_vec. 
 Dist_color = sqrt(sum((rgbStack - avgColor(ones(Q,1),:)).^2, 2));
 
-%% step 3 - use otsu thresholding to quickly seperate dark from light pixels. 
+%% step 3 - use otsu threshold method to quickly seperate "far off colors" pixels from the similar pix.
 
-%segment this distance plot using otsu thresholding
+%segment this distance plot using otsu's method 
 [counts,~] = histcounts(I,(0:0.05:1));
 T_otsu = otsuthresh(counts);
 

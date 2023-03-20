@@ -17,7 +17,9 @@ function varargout = imSegmentation_mosaics(varargin)
 %          Do yourself a favor, back it up, and then work on a copy.
 
 % Opt 2. Atypical use case. INPUT is a cell array of file paths. OUTPUT will be a
-% cell array of the same length as INPUT, except each cell will have a binary image files.  
+% cell array of the same length as INPUT, except each cell will have a binary image files. 
+% everything will still be saved as indicated. Only binary image masks will
+% output.
 
 % BACKGROUND -  This code was made to address new challenges associated with 
 % my ever-increasing propensity of whole slide images for any chromogenic
@@ -89,13 +91,14 @@ deleteYES = true;
     % 4. set these directory locations for your local data storage
     % NOTE: you MUST include the file seperator "/" at the end of each path...
 directoryImages = '/Users/YOUR/DIR_1/';
-directorytosaveinto = '/Users/YOUR/DIR_2/';
+directorytoSaveInto = '/Users/YOUR/DIR_2/';
    
     % 5. (optiona;) Include additional text to append to each save file (
 versionNum = '_v1';
     
-    % 6. start from somewhere in yoru directory of images other than the first file
+    % 6. start from somewhere in your directory of images other than the first file
 counter = 1;
+
 % each file in our image datastore gets a number. Set counter to be = to the 
 % # you want to start on. After a full loop, counter is reset to counter+1.
 %   Images in the datastore are in the same order as they will be in
@@ -129,7 +132,7 @@ fullFileNames = vertcat(imageDS.Files);
 %% 2. Create a handy structure called "handy" 
 % contains exp parameters, directory paths, tracks your progress, ect.
 
-my_dirs = struct('loadDir', directoryImages, 'saveDir', directorytosaveinto);
+my_dirs = struct('loadDir', directoryImages, 'saveDir', directorytoSaveInto);
 
 handy = struct('counter', counter, 'versionNum', versionNum,...
     'scaleFactor', scaleFactor, 'images', imageDS, 'OutputFlag', outputFlag,...
@@ -277,11 +280,27 @@ end
 %% 4. Saving!!
 
 % CAUTION: this will overwrite whatever might have been there before!!
-imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'_ForegroundSegmented_v1.png'), 'png',...
+
+if resizeBig
+    sF = 1/USETHISscaleFactor;
+    finalbinaryMask = imresize(finalbinaryMask, sF, {@oscResampling, 4});
+    imAdjRGB = imresize(imAdjRGB, sF, {@oscResampling, 4});
+    
+imwrite(finalbinaryMask, strcat(handy.directories.saveDir,activeFilename,'scale_1.0_', '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
+    'Compression','none');
+imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'scale_1.0_', '_adjustedRGBImage', handy.versionNum ,'.tiff'), 'tiff', ...
+    'Compression','none');
+else
+  imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'scale_', sprintf('%.4g', USETHISscaleFactor), '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
     'Compression','none');
 
-imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'_adjustedRGBImage_v1.tiff'), 'tiff', ...
-    'Compression','none');
+imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'scale_', sprintf('%.4g', USETHISscaleFactor), '_adjustedRGBImage',handy.versionNum,'.tiff'), 'tiff', ...
+    'Compression','none');  
+end
+
+if outputFlag > 0
+    varargout{outputFlag} = finalbinaryMask;
+end  
 
 %/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%
 %--%--\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/
@@ -298,7 +317,7 @@ end
 
 % update the counter!
 handy.counter = handy.counter+1;
-
+outputFlag = outputFlag +1;
 end
 
 end
@@ -338,10 +357,13 @@ function finalMask = segmentationWrapper(handy, imAdjRGB, varargin)
 %% in case there is already a draft mask...
 if numel(varargin) > 0 && ismatrix(varargin{1})
    binaryMask = varargin{1};
+   
 else
 % ... otherwise segment the image initially using morphology
- binaryMask = morphologySegment(imAdjRGB);   
+ 
+binaryMask = morphologySegment(imAdjRGB);   
 end
+
 %% Mask-Refining GUI
 finalMask = finalizeMASK(binaryMask,imAdjRGB);
 

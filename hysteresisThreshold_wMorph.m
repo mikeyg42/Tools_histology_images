@@ -6,7 +6,7 @@ function outOfBoundsMask = hysteresisThreshold_wMorph(grayImage, RGBimage)
 % attributes to set up the lower threshold level (the "wide net"). And then
 % I use IMEXTENDMAX, which calculates the H-maxima transform to locate
 % definitive peaks, which I can then use to index into the wide-net segmentation to 
-% remove extraneous object, which is accomplished with IMFILL and
+% remove extraneous object, which is accomplished with IMFILL.
 
 
 %% step 1: evaluate the histogram and determine otsu's threshold level

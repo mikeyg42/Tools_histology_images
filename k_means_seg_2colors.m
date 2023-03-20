@@ -1,4 +1,4 @@
-function outMask = k_means_seg_wrapperFcn(imgCurrent,varargin)
+function outMask = k_means_seg_2colors(imgCurrent,varargin)
 % outOfBoundsMask = k_means_seg_wrapperFcn(imgCurrent, [y/n to incl textures])
 % This calls the image processing toolbox function IMSEGKMEANS,(a 
 % segmentation method based on the k-means algorithm. It uses for this

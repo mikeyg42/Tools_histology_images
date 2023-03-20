@@ -10,17 +10,17 @@ close all force
 % we don't need to reredefine this variable each time we loop
 listMethods = {'DONE',...
     'Level Set Method segmentation',...
-    'color segmenting + graydiffweight',...
+    'Color segment w/ graydiffweight',...
     'Double threshold (hysteresis)',...
-    'Color segment with geodesics, w/ foreground sample from user ',...
+    'Color segment with geodesics, w/ provided foreground sample',...
     'Segment w/ Morphology',...
     'k means color clustering segmentation',...
-    'Texture segmentation (not Gabor)',...
+    'Texture segmentation options GUI (no Gabor)',...
     'thresholding / imclose, refined as polyshape',...
     'refine : dilate mask',...
-    'refine : active contour alone',...
+    'refine : just active contour (ie snakes)',...
     'refine : fill in holes',...
-    'refine : select the largest connected blob',...
+    'refine : select only the largest connected blob',...
     'refine : morphology; opening-recon. and closing-recon', ...
     'refine : adjust the vertices of the largest blob',...
     };  
@@ -29,10 +29,10 @@ listMethods = {'DONE',...
 size1 = size(binaryMask, 1:2);
 size2 = size(imAdjRGB, 1:2);
 if size1 ~=size2
-    disp('unequal sized images? resizing the mask!');
+    disp('unequal sized images! resizing the mask!');
     binaryMask = imresize(binaryMask, size2, {@oscRsesampling,4});
 end 
-%--------------- enter the gui loop -----------------
+%--------------- Make the list dialogue gui loop -----------------
 % save time by making image display figure outside the loop
 fig1 = figure; 
 axy = axes(fig1);
@@ -54,40 +54,51 @@ hold off
 
 drawnow;
 
-MyCounter = -10; 
+MyCounter = -10;
 while MyCounter < 0
     
     % this creates the modal dialogue GUI with the list of segementation options.
-    [indx, ~] = listdlg('SelectionMode', 'single','ListString', listMethods);
-    ImProcessing_choice = listMethods{indx};
+    [indx, tf] = listdlg('SelectionMode', 'single',...
+        'ListString', listMethods,...
+        'ListSize', [350, 200]);
     
-    if strcmp(ImProcessing_choice,'DONE')
-        MyCounter = 10;
+    if tf == 1
+        ImProcessing_choice = listMethods{indx};
+        
+        if strcmp(ImProcessing_choice,'DONE')
+            MyCounter = 10;
+            close all force
+            
+        else
+            outOfBoundsMask_old = binaryMask;
+            
+            close all force
+            
+            binaryMask = imProcessingResponse(outOfBoundsMask_old, ImProcessing_choice, imAdjRGB);
+            
+            fig2 = figure('Visible', 'off');
+            axy2 = axes(fig2);
+            
+            %show new boundary in yellow, old boundary in red
+            imshow(imAdjRGB,'Parent',axy2, 'Border', 'tight');
+            hold on
+            visboundaries(axy2, outOfBoundsMask_old, 'Color', 'r');
+            visboundaries(axy2, binaryMask, 'Color', 'b');
+            hold off
+            
+            fig2.Visible = 'on';
+            drawnow;
+        end
+    elseif tf == 0
         close all force
-        
-    else
-        outOfBoundsMask_old = binaryMask;
-        
-        close all force
-        
-        binaryMask = imProcessingResponse(outOfBoundsMask_old, ImProcessing_choice, imAdjRGB);
-        fig2 = figure('Visible', 'off'); 
-        axy2 = axes(fig2);
-        
-        %show new boundary in yellow, old boundary in red
-        imshow(imAdjRGB,'Parent',axy2, 'Border', 'tight');
+        disp('GUI closed without selection made. Reopening  now...');
+        fig3 = figure;  axy3 = axes(fig3);
+        imshow(imAdjRGB,'Parent',axy3, 'Border', 'tight');
         hold on
-        visboundaries(axy2, outOfBoundsMask_old, 'Color', 'r');
-        visboundaries(axy2, binaryMask, 'Color', 'b');
-        hold off
-        
-        fig2.Visible = 'on'; 
-        drawnow;
+        visboundaries(axy3, binaryMask, 'Color', 'r'); hold off
     end
-    
 end
-% reset app data for next time...
-setappdata(0, 'mySelection', []);
+
 close all force
 end
 
@@ -108,13 +119,13 @@ end
 function outOfBoundsMask = imProcessingResponse(outOfBoundsMask, choice, imgCurrent)
 
 switch choice
-   case 'Level Set Method segmentation' % working!!!
+   case 'Level Set Method segmentation' 
         outOfBoundsMask = runLevelSet(imgCurrent);
         
     case 'thresholding / imclose, refined as polyshape'
         outOfBoundsMask = binarizeTissueMG(imgCurrent) ;
         
-    case 'Double threshold (hysteresis)' %perfect
+    case 'Double threshold (hysteresis)'
          H = fspecial('gaussian',[3,3],3);
         imgMedian = mikeMedianFilter(imgCurrent, 2, 750, 'RGB');
         current_blurred = imfilter(imgMedian, H);
@@ -125,7 +136,7 @@ switch choice
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
         
-    case 'color segmenting + graydiffweight' % did not work on cd31_2734 all white
+    case 'Color segment w/ graydiffweight' 
         outOfBoundsMask = weightingPixelIntensityDiffs_RGBseg(imgCurrent);
          
     case 'refine : dilate mask'
@@ -137,25 +148,25 @@ switch choice
         imgCurrent_gray = rgb2gray(imgCurrent);
         outOfBoundsMask = activecontour(imgCurrent_gray, outOfBoundsMask, 60, 'edge', 'ContractionBias', 0.9);
         
-    case 'refine : active contour alone '
+    case 'refine : just active contour (ie snakes)'
         imgCurrent_gray = rgb2gray(imgCurrent);
         imgCurrent_gray = imresize(imgCurrent_gray, 0.5, {@oscResampling, 4});
-        imgFin = mikeMedianFilter(imgCurrent_gray, 1, 1200, 'grayscale');
+        imgFin = mikeMedianFilter(imgCurrent_gray, 2, 1250, 'Grayscale'); %2 iterations/ downsampled so largest side becomes 1250. reverts before snakes
         outOfBoundsMask = activecontour(imgFin, outOfBoundsMask, 75, 'Chan-Vese', 'SmoothFactor' ,0.15);
         outOfBoundsMask = imresize(outOfBoundsMask, 2, {@oscResampling, 4});
         
-    case 'Texture segmentation (not Gabor)' %good
+    case 'Texture segmentation options GUI (no Gabor)' 
         rescaleFactor = 2000/max(size(imgCurrent, 1:2));
-        imgRGB = imresize(imgCurrent,rescaleFactor, {@oscResampling,4});
-        imgC = rgb2gray(imgRGB);
-        outOfBoundsMask = textureFilterGUI(imgC);
+        imgRGB = imresize(imgCurrent,rescaleFactor, {@oscResampling,4}); %gets resized after the switch-case block 
+        imgGray = rgb2gray(imgRGB);
+        outOfBoundsMask = textureFilterGUI(imgGray); 
         
-    case 'Color segment with geodesics, w/ foreground sample from user'
+    case 'Color segment with geodesics, w/ provided foreground sample'
         outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
-    case 'k means color clustering segmentation' %all good
-        outOfBoundsMask = k_means_seg_wrapperFcn(imgCurrent,true);
+    case 'k means color clustering segmentation' 
+        outOfBoundsMask = k_means_seg_2colors(imgCurrent,true);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'refine : morphology; opening-recon. and closing-recon'
@@ -168,7 +179,8 @@ switch choice
         Iopenbyrecon_closingbyrecon = imcomplement(Iopenbyrecon_closingbyrecon);
         outOfBoundsMask = imregionalmax(Iopenbyrecon_closingbyrecon);
         
-        outOfBoundsMask= bwareafilt(outOfBoundsMask, 2);
+        outOfBoundsMask= bwareafilt(outOfBoundsMask, 5);
+        outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'refine : adjust the vertices of the largest blob'
         outOfBoundsMask  = vertexTweaking_handdrawn(outOfBoundsMask,imgCurrent, 130);

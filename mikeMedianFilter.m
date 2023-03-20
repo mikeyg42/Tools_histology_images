@@ -1,35 +1,60 @@
 function imgFin = mikeMedianFilter(img_, numIter, maxSizeDimension, colorspace)
-% numIter= 1 usually!
-% maxSizeDimension < 2500 otherwise SLOW! 1800 works very fast. 
-% colorspace == {'RGB', or 'Luminance' or 'grayscale'};
-% IMAGE_ should be a DOUBLE always
-% after doing median filter. it resizes back up to OG size and then
-% weighted averages back in the original image. 
+%syntax: imgFin = mikeMedianFilter(img_, numIter, maxSizeDimension, colorspace)
+% numIter = 1 usually! in order to make multiple iterations more effective,
+% I've included 3 slightly different 5x5 kernels that are cycled between
+% each iteration.
 
-img = ensureDoubleScaled(img_);
+% maxSizeDimension is an integer < 2500 (otherwise SLOW! 1800) works very
+% fast. Image will be downsampled to match this value, then upsampled back
+% to original after. To avoid any resizing, input 0 for maxSizeDimension.
+
+% colorspace == {'RGB', or 'Luminance' or 'grayscale'}... for Luminance,
+% the input should stilll be RGB. Will convert to RGB, median filter the first
+% channel, then concatenate with the unchanged channels 2 and 3! if your image 
+% is already converted luminance, indicate grayscale! 
+
+% IMG_ should be a DOUBLE always. if not single or double float, 
+% it will be converted to double before doing median filter. it resizes back 
+% up to OG size.  
+% weighted averages is taken with the average image in order to reduce any
+% artifacts from resampling or filtering
+
+if ~isfloat(img_)
+    img_ = ensureDoubleScaled(img_);
+end
+img_ = squeeze(img_);
 colorspace = upper(colorspace(1)); %either R or L or G
-if ndims(img) < 3
+
+if ndims(img_) < 3
     if ~strcmp(colorspace,'G')
-    warning('Colorspace is incorrectly defined.  Assuming input 2-dimensional array is a grayscale image');
+    warning('Colorspace is incorrectly defined.  Assuming input is a grayscale image because it has only 2 dimensions');
     end
-    img = cat(3, img, img, img);
+    img = cat(3, img_, img_, img_);
+elseif ndims(squeeze(img_)) == 3
+    img = img_;
+else
+    error('must be RGB image! too many dimensions in image for median filter');
 end
 
-flag = 0;
 [nrow, ncol] = size(img,1:2);
 if nrow>ncol %we want there to be more columns than rows! 
     img = rot90(img);
     [nrow, ncol] = size(img,1:2);
     flag = 1;
+else
+    flag = 0; 
 end
 
-outIm_col = maxSizeDimension;
-shrinkFactor = outIm_col/ncol;
-outIm_row = ceil(nrow*shrinkFactor);
+if maxSizeDimension == 0
+   outIm_row = nrow;
+   outIm_col = ncol;
+else
+    outIm_col = maxSizeDimension; % value from input of function
+    outIm_row = ceil(nrow*outIm_col/ncol);
+end
 
 % pre-allocate 
-imgResized = zeros(outIm_row,outIm_col,3, 'double');
-imgFin = zeros(outIm_row,outIm_col,3, 'double');
+imgFin = zeros(outIm_row,outIm_col,3, class(img));
 
 % shrink image to hasten the very slow median filter
 imgResized = imresize(img, [outIm_row,outIm_col] ,{@oscResampling,4}); 
@@ -55,7 +80,9 @@ filt3 = [0 0 1 0 0;
              
              jj = 0;
              while jj ~= numIter
-                 if mod(jj, 3) ==0, filt = filt1; num=11; elseif mod(jj,3)==1, filt= filt2; num = 13; else, filt = filt3; num = 7; 
+                 if mod(jj, 3) ==0, filt = filt1; num=11; 
+                 elseif mod(jj,3)==1, filt= filt2; num = 13; 
+                 else, filt = filt3; num = 7; 
                  end
                  
                  a1 = ordfilt2(a1, num, filt, 'symmetric'); % can brighten image by choosing 12 or higher
@@ -70,12 +97,14 @@ filt3 = [0 0 1 0 0;
              
          case 'L' %Luminance
              
-             [a1, a2, a3] = fastRGB2Lab(imgResized, 0);
+             [a1, a2, a3] = imsplit(rgb2lab(imgResized));
              
              a1 = a1./100;
              jj = 0;
              while jj ~= numIter
-                 if mod(jj, 3) ==0, filt = filt1; num=11; elseif mod(jj,3)==1, filt= filt2; num = 13; else, filt = filt3; num = 7; 
+                 if mod(jj, 3) ==0, filt = filt1; num=11; 
+                 elseif mod(jj,3)==1, filt= filt2; num = 13; 
+                 else, filt = filt3; num = 7; 
                  end
                  jj = jj+1;
                  a1 = ordfilt2(a1, num, filt, 'symmetric');
@@ -86,8 +115,15 @@ filt3 = [0 0 1 0 0;
              imgFin = lab2rgb(L3);
              
          case 'G' %grayscale
-             
-             [a1 , ~ , ~] = imsplit(imgResized);
+             try a1 = rgb2gray(imgResized);
+             catch
+                 if 2 == ndims(imgResized)
+                     a1 = imgResized;
+                 else 
+                     disp(strcat(class(imgResized), ' Is unable to be converted grayscale'));
+                 end
+             end
+                
              jj = 0;
              while jj ~= numIter
                  if mod(jj, 3) ==0
@@ -98,27 +134,20 @@ filt3 = [0 0 1 0 0;
                      filt = filt3; num = 7;
                  end
                  jj = jj+1;
-                 a1 = ordfilt2(a1, num, filt, 'symmetric'); % can brighten image by choosing 12 or higher  
+                 a1 = ordfilt2(a1, num, filt, 'symmetric'); % can simultaneously brighten image by choosing num values that are slightly higher...
              end
              imgFin(:,:,1) = a1;
-             imgFin(:,:,2:3) = [];
-             img(:,:,2:3) = [];
+             imgFin(:,:,2:3) = []; 
      end
      
-     imgFin = imresize(imgFin, size(img,1:2), {@oscResampling,4});
-     
-     FlagPeep = 0;
-     try imgFin = (img+imgFin.*2)./3; %if this doesn't work when tried, its definitely because of the dimension mismatch from rot90
-     catch
-         FlagPeep = 1;
+     if flag == 1
          imgFin = rot90(imgFin, -1);
-         imgFin = (img+imgFin.*2)./3;
+         img = rot90(img, -1);
      end
      
-     if FlagPeep == 0 && flag == 1
-         imgFin = rot90(imgFin, -1);
-     end
-
+     imgFin = imresize(imgFin, size(img_,1:2), {@oscResampling,4});
+     
+     imgFin = (img+imgFin.*2)./3; %if this doesn't work when tried, its because of the dimension mismatch from rot90
      
 end
 

@@ -27,17 +27,19 @@ function varargout = imSegmentation_mosaics(varargin)
 % also used Zen for stitching of my images. 
 
 % The functions I've included here SHOULD work just as well for HE, LFB,
-% Nissl, ect. THE CRITICAL ASSSUMPTION is that the ENTIRE stained tissue
-% is contained within the image, ie there should be a large blob in the
-% middle of a white sea. I've built in some flexibility so that if your blob
-% touches the edge once or twice its OKAY. But the majority of edges need to be
-% clear for any of this to work. Some aspects of the code will also assume
-% each WSI has 1 blob, but it is an ongoing effort to handle 2+ blobs. The 
-% SECOND caveat is that will NOT segment fluroescent histolgoy.
+% Nissl, (anything brightfield). Howver, the CRITICAL assumption is that
+% the ENTIRE foreground is contained within the image! By this I mean that there 
+% should be a large blob in the middle of a white sea, with minimal edge
+% intersections. I've tried to build in some flexibility so that if a blob
+% touches the edge once or twice some things work. But the majority of
+% edges must be clear for this to work. Some aspects of the code will also assume
+% each WSI has 1 blob, but it is an ongoing effort to handle 2+ blobs. 
 
-%  The script, as is, relies heavily upon your file naming convention.
-%  Prepending my convention with your own easy and will ensure you have no
-%  issues. It requires three, underscore seperated identifiers: 
+% Note: This code as is will NOT segment WSI images of fluroescent microscopy.
+
+% Note: The script, as is, relies heavily upon your file naming convention.
+%  Prepending my convention with your own is easy and will ensure you have no
+%  issues. It requires three, underscore-seperated identifiers: 
 
 %               {1} _ {2} _ {3} _ {optional 4}.tiff
 %        ie. "GROUPid_SAMPLEid_STAINid_ExtraInfo.tiff   
@@ -65,15 +67,6 @@ function varargout = imSegmentation_mosaics(varargin)
 % And for more serious problems, check out the open source dockerized 
 % workflow called MCMICRO, which uses the program BaSiC, (also an ImageJ plugin). 
 
-% This script allows you to pick up where you left off.....
-
-
-
-
-%<FINISH THIS>%
-
-
-
 % Michael Glendinning, 2023
 
 close force all
@@ -81,42 +74,38 @@ clear all
 
 %% set your parameters
 
-    %1. Set your scale factor. The closer to 1 the better! If you
-    %experience crashing or painfully slow processing, raise this.
-    scaleFactor = 2.8;  
+    % 1. Set your scale factor. The closer to 1 the better! If you
+    % experience crashing or painfully slow processing, raise this.
+scaleFactor = 2.8;  
     
-    %2. Define the file formats in which raw images will use the following
-    %extensions:1.4 or
-    rawdata_format = {'.tiff','.tif'};
+    % 2. Define the file formats in which raw images will use the following
+    % extensions:1.4 or
+rawdata_format = {'.tiff','.tif'};
 
-    %3. delete raw data files after processing and saving? 
-    deleteYES = 1;
-% NOTE: AFTER PROCESSING, ALL RAW DATA IN directoryImages WILL BE DESTROYED, iff deleteYES equals 1 **
+    % 3. delete raw data files after processing and saving? 
+    % NOTE: AFTER PROCESSING, ALL RAW DATA IN directoryImages WILL BE DESTROYED, iff deleteYES equals 1 **
+deleteYES = true;
     
-    %4. set these directory locations for your local data storage
-% NOTE: you MUST include the file seperator "/" at the end of each path...
-
-    directoryImages = '/Users/jglendin/Desktop/tiled images as tiffs/';
-    directorytosaveinto = '/Users/jglendin/Dropbox - Michael/Dropbox/processedMSimages/';
+    % 4. set these directory locations for your local data storage
+    % NOTE: you MUST include the file seperator "/" at the end of each path...
+directoryImages = '/Users/YOUR/DIR_1/';
+directorytosaveinto = '/Users/YOUR/DIR_2/';
    
-    %5. (optiona;) Include additional text to append to each save file (
-    versionNum = '_v1';
+    % 5. (optiona;) Include additional text to append to each save file (
+versionNum = '_v1';
     
+    % 6. start from somewhere in yoru directory of images other than the first file
+counter = 1;
+% each file in our image datastore gets a number. Set counter to be = to the 
+% # you want to start on. After a full loop, counter is reset to counter+1.
+%   Images in the datastore are in the same order as they will be in
+%   the field "filenames" of the structural array "handy"... 
 
-    
-%% OPTIONAL. start from somewhere in yoru directory of images other than the first file
-
-counter = 2;
-
-% note, counter allows us to iteratively navigate our image datastore with our data.
-%       Images in the datastore are in the same order as they will be in
-%       the field "filenames" within our master array "handy".(i.e.
-%       handy.filenames{handy.counter} should always tell you which file is active.
 
 %--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%
-%%  Don't change anything else 
-%   |     |     |     |     |
-%   V     V     V     V     V
+%%  Don't change anything else down here
+%   |       |       |       |       |
+%   V       V       V       V       V
 
 %%  1. Load images and log some information about them
 if nargin ~= 0 && nargout ~= 0
@@ -164,29 +153,29 @@ nImages = numel(imageNames);
 
 while counter<nImages % loop to go through your entire image datastore
 activeFilename = handy.filenames{handy.counter};
+% handy.filenames{handy.counter} will always tell you which file is active. 
 
-% prints the date and time into command window
+% print the date and time into command window so you can track efficiency
 printStartTime_imProcessing(activeFilename);
 
-% I can leverage an image's format to inform me of what the contexts are :
-%   RGB/grayscale images saved as ".tiffs",  binary segmentation saved as ".png"
+% I can leverage an image's fileformat to inform me of what it is I've
+% saved... RGB/grayscale images -> ".tiffs",  binary segmentation --> ".png"
 
-% I have saved files in the format of: "ExpGROUPid_SAMPLEid_STAINid_anyExtraInfo.tiff" e.g. "MS_317_TMEM119_stitched19.tiff"
+% recall the format: "ExpGROUPid_SAMPLEid_STAINid_anyExtraInfo.tiff" e.g. "MS_317_TMEM119_stitched19.tiff"
 namePieces = split(activeFilename, '_');
 groupID =  namePieces{1};
 sampleID = namePieces{2};
 stainID = namePieces{3};
 
 % Now we look within the dir "allSavedFiles" for filenames sharing these ID's:
-matchingIDandStain = contains(allSavedFiles, sampleID, 'IgnoreCase',true).*contains(allSavedFiles, stainID, 'IgnoreCase',true);
+matchingIDandStain = contains(allSavedFiles, sampleID, 'IgnoreCase',true) .* contains(allSavedFiles, stainID, 'IgnoreCase',true);
 
 % How we then proceed depends on how many matches we find...
 numberMatches = sum(matchingIDandStain);
 
 switch num2str(numberMatches)
     
-    % ...if we have zero matches, we start from beginning of processing
-    % workflow
+    % ...if we have zero matches, we start from beginning of processing workflow
     case '0'
         % read in the raw image...
         [imgCurrentlyBig, ~] = readimage(handy.images, handy.counter); % handy.images is my raw image datastore!!!
@@ -233,7 +222,6 @@ switch num2str(numberMatches)
             binaryMask = imresize(binaryMask, [sz(1), sz(2)], {@oscResampling, 4});
             binaryMask = logical(binaryMask);
             
-            
             % read into workspace the raw image file, then the preprocessing
             % fcn to generate the adjusted RGBim. then we can proceed to
             % segmentation function
@@ -243,12 +231,13 @@ switch num2str(numberMatches)
             
             % OPTION 3 (unlikely) = we have some non-png, non-tiff fileformats in saveDIr
         else %ie you have one match in the directory, but its neither a tiff or a png.
-            disp('you have errant fileformats in your saveDir. Get rid of anything not PNG and TIFF');
+            disp('you have errant fileformats in saveDir. Get rid of anything not PNG and TIFF with near identical names...');
             return;
         end
         
         %-------------------------------------------------------------------------%
         %-------------------------------------------------------------------------%
+        
         % 2 matches is the BEST case scenario! 2 matches suggests we have what we need:
         %     TWO images in our saveDir matching the identifiers in our active file.
         
@@ -282,14 +271,10 @@ switch num2str(numberMatches)
         return
         
 end
-
-%-------------------------------------------------------------------------%
-%-------------------------------------------------------------------------%
+%-|---%---|---%---|---%---|--%---|---%---|---%---|---%---|---%---|---%---|---%---|
+%---|---%---|---%---|---%---|--%---|---%---|---%---|---%---|---%---|---%---|---%---|
         
 %% 4. Saving!!
-
-
-
 
 % CAUTION: this will overwrite whatever might have been there before!!
 imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'_ForegroundSegmented_v1.png'), 'png',...
@@ -298,8 +283,18 @@ imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'_Fore
 imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'_adjustedRGBImage_v1.tiff'), 'tiff', ...
     'Compression','none');
 
+%/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%
+%--%--\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/
+        
+%% 5. (optional) move file into recycling bin
+recycle on;
 
-%% DONE! first save, then move on to the next image
+if handy.deleteYES
+delete(strcat('/Users/jglendin/Desktop/tiled images as tiffs/', 'activeFilename'));
+end
+
+
+%% DONE! move on to the next image
 
 % update the counter!
 handy.counter = handy.counter+1;

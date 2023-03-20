@@ -1,12 +1,15 @@
 
 function outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent)
-    % A function I wrote to wrap the IPT function that implements a semi-automated geodesic
-    % soft-segmentation method (a "distance-based color segmentation algorithm"). 
+% syntax outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent)
+    % This calls the IPT function for the geodesic soft-segmentation method
+    % (a "distance-based color segmentation algorithm"), optimizing for WSI and 
+    % semi-automating the requisite inputs. 
     
-    % For some reason the builtin function often outputs a somewhat dilated
-    % mask. To rectify this, I use the probability map that the function
-    % outputs as an optional auxillary output. I threshold that map at 95% level,
-    % and then multiply the two mask together to produce the final segmentation.  
+    % Notably, the builtin IPT function I've found outputs a slightly dilated
+    % mask... I usually have better segmentation using the "probability map" that
+    % is an optional auxillary output. I threshold that map at 95% level,
+    % and then multiply it with the normal output mask to mitigate any dilation. 
+
     % Michael Glendinning, 2022
     
  close all force

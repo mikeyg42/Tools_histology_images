@@ -129,8 +129,7 @@ end
 % be the only point in the point cloud unmoved
 PointsToFit_fixNorm = rotate_CCW_around_a_point(PointsToFit_fix, theta2, fpivot);
 
-% 4. fit rotated points to the best curve {
-%    1. sine wave,      2-4. polynomial of the 1st, 2nd, & 3rd degrees, 
+% 4. fit rotated points to the best curve 
 xf = PointsToFit_fixNorm(:, 1);
 yf = PointsToFit_fixNorm(:, 2);
 
@@ -164,36 +163,36 @@ if mod(cornerNum, 2)==0
     xyPoints_f = fliplr(xyPoints_f);
 end
 
-%% VISUALIZING RESULTS
-
-%rotated poinnts fit to the curve
-fig4 = uifigure('Visible', 'on');
-tl = tiledlayout(fig4, 2,2,'TileSpacing', 'compact', 'Padding', 'compact');
-
-nexttile
-ax11 = axes(tl);
-title(ax11, 'FIXED');
-imshow(IMG_gray, 'Parent', ax11); 
-hold on; plot(xf, yf, 'c-o', yf, xf, 'm-o'); hold off
-
-nexttile
-ax12 = axes(tl);
-title(ax12, 'MOVING');
-imshow(LESION_gray, 'Parent', ax12); 
-hold on; plot(xm, ym, 'c-o', ym, xm, 'm-o'); hold off
-
-nexttile
-ax21 = axes(tl);
-imshow(IMG_gray,'Parent', ax21); 
-hold on; plot(Cheb_Points_f(:,1), Cheb_Points_f(:,2), 'go', 'MarkerSize', 10); hold off
-
-nexttile
-ax22 = axes(tl);
-imshow(LESION_gray, 'Parent', ax22); 
-hold on; plot(Cheb_Points_m(:,1),Cheb_Points_m(:,2), 'mo', 'MarkerSize', 10); hold off
-
-fig4.Visible = 'on';
-drawnow limitrate nocallbacks
+% %% VISUALIZING RESULTS
+% 
+% %rotated poinnts fit to the curve
+% fig4 = uifigure('Visible', 'on');
+% tl = tiledlayout(fig4, 2,2,'TileSpacing', 'compact', 'Padding', 'compact');
+% 
+% nexttile
+% ax11 = axes(tl);
+% title(ax11, 'FIXED');
+% imshow(IMG_gray, 'Parent', ax11); 
+% hold on; plot(xf, yf, 'c-o', yf, xf, 'm-o'); hold off
+% 
+% nexttile
+% ax12 = axes(tl);
+% title(ax12, 'MOVING');
+% imshow(LESION_gray, 'Parent', ax12); 
+% hold on; plot(xm, ym, 'c-o', ym, xm, 'm-o'); hold off
+% 
+% nexttile
+% ax21 = axes(tl);
+% imshow(IMG_gray,'Parent', ax21); 
+% hold on; plot(Cheb_Points_f(:,1), Cheb_Points_f(:,2), 'go', 'MarkerSize', 10); hold off
+% 
+% nexttile
+% ax22 = axes(tl);
+% imshow(LESION_gray, 'Parent', ax22); 
+% hold on; plot(Cheb_Points_m(:,1),Cheb_Points_m(:,2), 'mo', 'MarkerSize', 10); hold off
+% 
+% fig4.Visible = 'on';
+% drawnow limitrate nocallbacks
 %--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%
 %% saving the results into a structural array "s"
 

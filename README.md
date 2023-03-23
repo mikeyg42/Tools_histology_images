@@ -1,10 +1,11 @@
 # Image Processing Tools for Whole Slide Imaging Brightfield Histology %/n
 
 <p>% ----------------------------------------------------%<p>
-<p>Welcome to my repo! My name is Michael Glendinning, and here you will find a collection of some of the MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology). In that capacity, I did a LOT of immunohistochemistry and in situ hybridization experiments. I forunate to have access to amazing training at the bench, and access to exensive collections of carefully curated probes. I also was fortunate to have access to state-of-the-art microscopes. <p>
+<p>Welcome to my repo! My name is Michael Glendinning, and here you will find a collection of some of the MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology). In that capacity, I did a LOT of immunohistochemistry and in situ hybridization experiments. I forunate to have access to amazing training at the bench, and access to exensive collections of carefully curated probes. I also was fortunate to have access to state-of-the-art microscopes. BUT.............. <p>
 
 
-
+<p>.<p>
+  
 By virtue of my newfound unemployment, I've finally been able to devote some time to testing and cleaning some of the plentitudes of code I've accumulated over nearly a decade of my using MATLAB to both impel and propel my neuroscience research. 
 
 This is a living repository, and so I cannot promise that everything works flawlessly (particularly if your images are substantially different from what I have been using for testing), nor can I promise that the code won't be rewritten if you return back here at some later date! But, I've done what I can to make these scripts maximally robust and adaptable. Feel free to reach out to me or submit a pr in the event something does not make sense, bugs are encountered, or there is room for improvement.  

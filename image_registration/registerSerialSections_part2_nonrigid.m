@@ -2,12 +2,17 @@ function [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(var
 %syntax: [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(varargin)
 
 %% Part 2 of registration: nonrigid geometric transformation with control points placed EXCLUSIVELY programically .
-% name of the game is placing control points programmically, and with great
-% care.
+% name of the game is placing control points programmically, and with great care.
 
-%Using points, I try some nonrigid registration ( LWH / polynomials). After
-%picking the best of those models, I do the final cajoling of the points
-%together using a modified diffeomorphic demons approach
+%Using these points, I try 3 different nonrigid registration (LWH /2deg+3deg polynomial) techniques. 
+% After user picks the best of those, I follow up with a quick call of Thirion's demons
+% algorithm, after which, images are usually very much aligned smoothly. registration is
+% applied simultaneously to the image and its mask. 
+
+%Michael Glendinning, 2023
+% note - some aspects of this script are still a work in progress! They are actively being
+% worked on however.
+
 
 id = 'MATLAB:polyshape:repairedBySimplify';
 warning('off', id);
@@ -43,7 +48,7 @@ IMG_gray(~IMG_mask) = 1;
 hull_1 = convhull(ax, ay);
 
 % 2. convert hull into polyshape
-HULL_image1 = polybuffer(polyshape(ax(hull_1), ay(hull_1)),  0.1, 'JointType','miter');
+HULL_image1 = polybuffer(polyshape(ax(hull_1), ay(hull_1)),  4, 'JointType','miter');
 
 % 3. get coordinaes of contour
 img_Cont = contourc(im2double(IMG_mask), [0.5, 0.5]); 
@@ -68,18 +73,18 @@ bw3 = bwperim(imgBW);
 [~, jj] = pdist2([c0l,r0w],[1, 1], 'euclidean', 'Smallest', 1);
 C = bwtraceboundary(imgBW, [r0w(jj),c0l(jj)], 'NE'); 
 
-% 6. make the shapefrom the contour vertices that were not outliers!
+% 6. make the shape from the contour vertices that were not outliers!
 pgon_fixed = polyshape(C(:,2), C(:,1),  'SolidBoundaryOrientation', 'cw');
 pgon_fixed = simplify(pgon_fixed,'KeepCollinearPoints',1);
 pgonFixed_simpler = rmholes(pgon_fixed); 
 
-% +++++++++
+% +++++++++ NOW THE MOVING IMAGE
 % 1. make hull
 [by, bx]=find(MOVING_mask); 
 hull_2 = convhull(bx, by);
 
 % 2. convert hull into polyshape
-HULL_image2 = polybuffer(polyshape(bx(hull_2), by(hull_2)), 0.1, 'JointType','miter'); 
+HULL_image2 = polybuffer(polyshape(bx(hull_2), by(hull_2)), 4, 'JointType','miter'); 
 
 % 3. get coordinaes of contour
 MOVING_Cont = contourc(im2double(MOVING_mask), [0.5, 0.5]); 
@@ -104,10 +109,17 @@ bw2 = bwperim(lesBW);
 [~, ii] = pdist2([cl,rw],[1, 1],'euclidean', 'Smallest', 1);
 B = bwtraceboundary(lesBW, [rw(ii),cl(ii)], 'NE'); 
 
-% 6. make the shapefrom the contour vertices that were not outliers!
+% 6. make the shape from the contour vertices that were not outliers!
 pgon_move = polyshape(B(:,2), B(:,1), 'SolidBoundaryOrientation', 'cw');
 pgon_move = simplify(pgon_move,'KeepCollinearPoints',1);
 pgonMOVING_simpler = rmholes(pgon_move);
+
+%-----------
+% QUERY your turning distance to evaluate if everything is working...
+td = turningdist(pgon_move, pgon_fixed);
+if td <0.3
+    disp('polygons are VERY different, you might have an issue?');
+end
 
 %----------------------------------------------------------------------------
 %% these polygons are not quite identical to mask. Therefore we need to adjust the corner points
@@ -120,7 +132,7 @@ movingM_pgon = pgonMOVING_simpler.Vertices(cornerIndxMoving(1:4, 1), :);
 fixedM_pgon = pgonFixed_simpler.Vertices(cornerIndxFixed(1:4, 1), :);
 
 % if the diffference between matrix coordinate and the nearest point on
-% plygon is more than 4 pixels, then CPCORR function won't fix it.
+% polygon is more than 4 pixels, then CPCORR function won't fix it.
 diffCorn = movingM_pgon - movingMat(1:4,:);
 diffCorn_2 = fixedM_pgon - fixedMat(1:4,:); 
 Midx = (diffCorn(:,1).^2+diffCorn(:,2).^2).^0.5 > 4;
@@ -141,25 +153,28 @@ movingM = movingM_pgon;
 movingM = cpcorr(movingM,fixedM,MOVING_gray,IMG_gray); 
 fixedM = cpcorr(fixedM,movingM, IMG_gray,MOVING_gray);
 
+
 % ----------- quick sanity check -----------
 sumMoving = sum(movingM,2);
 sumFixed = sum(fixedM, 2);
 [~, id1] = min(sumMoving); [~, id3] = max(sumMoving);
 if id1~=1 || id3 ~=3 || movingM(4, 1)>movingM(2,1) || movingM(4, 2)<movingM(2,2)
-disp('error of order: MOVING'); pause(1);
+disp('error of order: MOVING'); return;
 end
 
 [~, fid1] = min(sumFixed); [~, fid3] = max(sumFixed);
 if fid1~=1 || fid3 ~=3 || fixedM(4, 2)<fixedM(2,2) || fixedM(4, 1)>fixedM(2,1)
-disp('error of order: FIXED'); pause(1);
+disp('error of order: FIXED'); return;
 end
 % -----------  end sanity check  -----------
+
+
 
 %% Use curve fitting to place evenly spaced points along each edge of the tissue
 
 
 %% SET NUM POINTS ALONG AN EDGE
-pointsPerSide = 16; % multiplied by 4 +9 gives total CP's
+pointsPerSide = 15; % multiplied by 4 +9 gives total CP's
 %%
 %preallocate
 evenlydistMoving = zeros(pointsPerSide*4,2, 'double'); 
@@ -194,7 +209,7 @@ for cornerN = 1:4
     end
     
 
-    % repeat with fixed
+% repeat with fixed
     cornsFixed = [fixedM(cornerN, 1:2); fixedM(cornerN_plus1,1:2)];
     startingF = cornsFixed(2, :);
     endingF = cornsFixed(1,:);
@@ -245,13 +260,15 @@ fixedContour =  [C(:,2), C(:,1)];
             
         elseif mod(cornerN, 2) == 1  
             flagg = 1; 
+            c=0;
             while flagg == 1
             indx_m = find(movingContour(:,1) == round(xy_moving(jj, 1)));
             
             nPts_m = numel(indx_m); % number of intersections of your xy_moving point with contour
                 switch nPts_m
                     case 0
-                        xy_moving(jj, 1) = round(xy_moving(jj, 1)+0.6); %shift the x coordinate half a pixel to the right, then try again
+                        c = c+1;
+                        xy_moving(jj, 1) = round(xy_moving(jj, 1)+0.6); %shift the x coordinate, then try again
                         flagg = 1; %NOT DONE
                     case 1
                         distancefromcurvetopolygon_m(jj, 1) = pdist2(xy_moving(jj, 1:2), movingContour(indx_m, 1:2), 'euclidean');
@@ -264,17 +281,25 @@ fixedContour =  [C(:,2), C(:,1)];
                         xy_moving(jj, 2) = hits(Id_multi,2);
                         flagg = 2; %DONE
                 end
+                if c > 20 && c<51
+                    xy_moving(jj,1) = round(xy_moving(jj, 1)-40);
+                elseif c>50
+                    disp('there is an issue aligning points to contour in moving image');
+                    return
+                end
             end
 % ^ moving            
 %=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
 % v fixed
 
             flage = 1;
+            c=0;
             while flage ==1
                 indx_f = find(fixedContour(:,1) == round(xy_fixed(jj, 1)));
                 nPts_f = numel(indx_f);
                 switch nPts_f
                     case 0
+                        c=c+1;
                         xy_fixed(jj, 1) = round(xy_fixed(jj, 1)+0.6); 
                         flage = 1; %NOT DONE
                     case 1
@@ -288,6 +313,12 @@ fixedContour =  [C(:,2), C(:,1)];
                         xy_fixed(jj, 2) = hitts(Id2_multi,2);
                         flage = 2; %DONE
                 end
+                if c > 20 && c<51
+                    xy_fixed(jj,1) = round(xy_fixed(jj, 1)-40);
+                elseif c>50
+                    disp('there is an issue aligning points to contour in fixed image');
+                    return
+                end
             end
   %                                            ^ ^
   % -=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-|%|-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
@@ -297,11 +328,13 @@ fixedContour =  [C(:,2), C(:,1)];
         elseif mod(cornerN, 2) == 0 %ie QQ = 2 or 4  
             
             flaggy =1;
+            c=0;
             while flaggy ==1
             indx_f = find(fixedContour(:,2) == round(xy_fixed(jj, 2)));
             nPts_f = numel(indx_f);
                 switch nPts_f
                     case 0
+                        c=c+1;
                         xy_fixed(jj, 2) = round(xy_fixed(jj, 2)+0.6); 
                         flaggy = 1; %NOT DONE
                     case 1
@@ -315,16 +348,24 @@ fixedContour =  [C(:,2), C(:,1)];
                         xy_fixed(jj, 1) = hits(Id_multi,1);
                         flaggy=2;
                 end
+                if c > 20 && c<51
+                    xy_fixed(jj,1) = round(xy_fixed(jj, 1)-40);
+                elseif c>50
+                    disp('there is an issue aligning points to contour in fixed image');
+                    return
+                end
             end
 % ^ fixed             
 %=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
  % v moving
             flags = 1;
+            c=0;
             while flags == 1
             indx_m = find(movingContour(:,2) == round(xy_moving(jj, 2)));
             nPts_m = numel(indx_m);
                 switch nPts_m
                     case 0
+                        c=c+1;
                         xy_moving(jj, 2) = round(xy_moving(jj, 2)+0.6); 
                         flags = 1; %NOT DONE
                     case 1
@@ -339,44 +380,25 @@ fixedContour =  [C(:,2), C(:,1)];
                         flags=2;
                 end
             end 
+            if c > 20 && c<51
+                 xy_moving(jj,1) = round(xy_moving(jj, 1)-40);
+            elseif c>50
+                 disp('there is an issue aligning points to contour in moving image');
+                 return
+             end
         end
  %=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
     end %end looping through points
     clear flag*
-    %% visual #1+2 - shows once per side
     
-%     figure(1); imshow(MOVING_gray); hold on; plot(pgonMOVING_simpler); visboundaries(MOVING_mask,'color', 'green', 'LineStyle', ':', 'LineWidth', 1, 'EnhanceVisibility', false); plot(PointsToFit(:,1), PointsToFit(:,2), 'r-', 'LineWidth', 3);
-%    
-%     figure; imshow(IMG_gray); hold on; plot(pgonFixed_simpler); visboundaries(IMG_mask,'color', 'green', 'LineStyle', ':', 'LineWidth', 1, 'EnhanceVisibility', false); plot(PointsToFit_fix(:,1), PointsToFit_fix(:,2), 'r-', 'LineWidth', 3);
-%     drawnow;
-%     
-%     f2 = figure('Visible', 'off'); 
-%     axy1 = {ax1, ax3, ax5, ax7};
-%     axy2 = {ax2, ax4, ax6, ax8};
-%     gl = griddedlayout(f2, 'Size', [4, 4]);
-%     axy1{cornerN} = axes(gl, 'Layout.Row', cornerN, 'Layout.Column', 1);
-%     
-%     axy2{cornerN} = axes(gl, 'Layout.Row', cornerN, 'Layout.Column', 2);
-% 
-%     imshow(IMG_gray,  'Parent', axy2{cornerN}); hold on; plot(xy_fixed(1,1), xy_fixed(1, 2), 'm*',xy_fixed(2:end,1), xy_fixed(2:end,2), 'co');
-%     
-%      imshow(MOVING_gray, 'Parent', axy3); 
-%      hold on; 
-%      plot(pgonMOVING_simpler);
-%    
-%      plot(xy_moving(1,1), xy_moving(1, 2), 'm*',xy_moving(:,1), xy_moving(:,2), 'co');
-%    hold off
-%     f2.Visible = 'on';
-%     drawnow limitrate nocallbacks
-%     pause(5);
-    
-    %%
+    %% read out avg residual
     fixed_residuals = sum(distancefromcurvetopolygon_f(:))/pointsPerSide;
     moving_residuals = sum(distancefromcurvetopolygon_m(:))/pointsPerSide;
    
     disp(strcat('FIXED: Avg. distance from point to curve: ', num2str(fixed_residuals)));
     disp(strcat('MOVING: Avg. distance from point to curve: ', num2str(moving_residuals)));
 
+    %% 
     evenlydistMoving(counter:counter+pointsPerSide-1,:) = xy_moving(1:end-1,:);
     evenlydistFixed(counter:counter+pointsPerSide-1,:) = xy_fixed(1:end-1,:);
     

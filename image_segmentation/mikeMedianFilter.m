@@ -19,6 +19,8 @@ function imgFin = mikeMedianFilter(img_, numIter, maxSizeDimension, colorspace)
 % weighted averages is taken with the average image in order to reduce any
 % artifacts from resampling or filtering
 
+%Michael Glendinning, 2022
+
 if ~isfloat(img_)
     img_ = ensureDoubleScaled(img_);
 end

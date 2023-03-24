@@ -162,7 +162,7 @@ switch choice
         outOfBoundsMask = textureFilterGUI(imgGray); 
         
     case 'Color segment with geodesics, w/ provided foreground sample'
-        outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent);
+        outOfBoundsMask = geoProbSeg_2tone(imgCurrent);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'k means color clustering segmentation' 

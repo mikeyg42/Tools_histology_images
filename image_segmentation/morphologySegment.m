@@ -1,7 +1,10 @@
 function binaryMask = morphologySegment(imAdjRGB)
 % imAdjRGB MUST be a double RGB image (3 channels only, no alpha chl). 
 % It is assumed that background correction (I use the complement of the tophat of
-% the complement image along with imadjust). 
+% the complement image along with imadjust) has been completed already. Uses a whole lot
+% of morphological functins to segment an RGB image into a binary foreground/background
+% mask.
+% Michael Glendinning, 2023
 
 se1 = strel('diamond', 11);
 
@@ -47,7 +50,6 @@ myMaskOne = bwareafilt(logical(myMask),1);
 maskymask = im2double(myMask);
 
 areaBig = sum(maskymask(:));
-warning('on',id)
 
 %percentage of the whole mask you've made that is the 1 largest continuous blob
 ratio = sum(myMaskOne(:))/areaBig;

@@ -1,4 +1,8 @@
  function [MOVINGmask_pad, MOVINGgray_pad, IMGmask_pad, IMGgray_pad] = pad4Images(minDistEdge, MOVINGmask, MOVINGgray, IMGmask, IMGgray)
+% [MOVINGmask_pad, MOVINGgray_pad, IMGmask_pad, IMGgray_pad] = pad4Images(minDistEdge, MOVINGmask, MOVINGgray, IMGmask, IMGgray)
+% Pad set of 2 images+2 masks enough that every white pixel in the mask is some specified distance away from edge.
+% Michael Glendinning, 2023
+
 
 %these images are the perimeter outline of their respective binary blobs
 BW1 = bwperim(MOVINGmask);  

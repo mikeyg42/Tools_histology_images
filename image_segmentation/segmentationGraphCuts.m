@@ -6,6 +6,8 @@ function BWfull = segmentationGraphCuts(imgCurrent)
 % covers the preprocessing, and postprocessing of the builtin function
 % GRABCUTS. 
 
+% Michael Glendinning, 2022
+
 img = im2double(imgCurrent);
 img = padarray(img, [1,1,1], 1, 'both');
 
@@ -13,14 +15,6 @@ img(img(:,:,:)>0.9)=1;
 img = img.^4; %will darken everything except the 1's which don't change. values close to 1 get less dark proportionally
 
 [M,N] = size(img);
-
-phix = 0.5*(img(3:end,2:N+1) - img(1:M,2:N+1));
-phiy = 0.5*(phip(2:M+1,3:end) - phip(2:M+1,1:N));
-phixx = phip(3:end,2:N+1) + phip(1:M,2:N+1) - 2*phi;
-phiyy = phip(2:M+1,3:end) + phip(2:M+1,1:N) - 2*phi;
-phixy = 0.25.*(phip(3:end,3:end) - phip(1:M,3:end) - phip(3:end,1:N) + phip(1:M,1:N));
-
-
 
 %% specification of some parameters
 

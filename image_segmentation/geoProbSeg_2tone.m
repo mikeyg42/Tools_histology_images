@@ -1,6 +1,6 @@
 
-function outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent)
-% syntax outOfBoundsMask = geodesicProbabilitySeg_2colors(imgCurrent)
+function outOfBoundsMask = geoProbSeg_2tone(imgCurrent)
+% syntax outOfBoundsMask = geoProbSeg_2tone(imgCurrent)
     % This calls the IPT function for the geodesic soft-segmentation method
     % (a "distance-based color segmentation algorithm"), optimizing for WSI and 
     % semi-automating the requisite inputs. 

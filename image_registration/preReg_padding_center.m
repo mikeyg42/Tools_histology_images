@@ -5,7 +5,7 @@ function [fixedMat_new,movingMat_new, myNEWimages] = preReg_padding_center(fixed
 % ref_IMGgray}; and myNEWimages has the same order in its cell array
 
 % This is not desgined for RGB images or anything w/ third dimension. just use
-% imsplit in that event and feed channels though
+% imsplit if you need to do this with RGB im and feed channels though one by one. 
 %
 %fixed and moving mat must be n x 2 [x,  y] coordinates. This was written
 % with the intention of centering my quadrilaterials' corner points + centroid 
@@ -15,6 +15,8 @@ function [fixedMat_new,movingMat_new, myNEWimages] = preReg_padding_center(fixed
 % all fixed images must be the same size as other fixed ims!
 % all moving images must be the same size as the other moving ims!! 
 % any logical masks
+
+%Michael Glendinning 2023
 
 %% first we adjust the matrices so that the arithmetic mean of all coordinates 
 %% in one matrix is on top of the arithmetic mean of the other set of coordinates

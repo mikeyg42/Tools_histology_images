@@ -1,6 +1,6 @@
 # Image Processing Tools for Whole Slide Images of Brightfield Histology
-
 <p>% ----------------------------------------------------%<p>
+  
 <p>Welcome to my repo! My name is Michael Glendinning, and here you will find a collection of some of the MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology).<p>
 
 <p>I got very excited at my most recent job when I discovered that our microscopes had the ability to acquire whole-slide images. Generally speaking, its quite easy to lose sight of the forest between the proverbial trees when looking under a microscope, particularly at high magnification. Sometimes, it is also hard to avoid unknowningly introducing bias. I found it to be a substantial improvement in my workflow to capture the whole slide image of my experiments and then use software to randomly sample them to extract regions of interest (ROIs), removing the opportunity for my biases to influencing my choice of ROIs, and reducing the chance that I miss something interesting on the mesoscopic scale. But, I had to adapt some code and write some new code to handle such large images, out of which this respository was born. <p>
@@ -11,7 +11,7 @@
 
 <p>% ----------------------------------------------------%<p>
   
-<p>IMAGE SEGMENTATION<p>
+# IMAGE SEGMENTATION
  
 <p>The first, and more thoroughly tested/annotated, is a library of tools for the semi-automated foreground/background segmentation of large, brightfield whole-slide images. As long as your images hold the following attributes, this tool should be well-suited to your workflow:<p>
 * your images are in RGB format. MATLAB has a nice library of color space conversion functions if youre images are described in another color space. If you have only grayscale images though, you will need to rewrite some code or devise a creative work-around.
@@ -22,7 +22,8 @@
   
 <p>% ----------------------------------------------------%<p>
  
- <p>IMAGE REGISTRATION<p>
+# IMAGE REGISTRATION
+  
  <p>This collection of functions is less modular than the segmentation code. Its goal is the registration of chromogenic stains performed on serial sections and imaged using brightfield microscopy. <p>
   <p> My motivation was a project in which I was interested in characterizing how the expression of certain markers of interest varied in the immediate vicinity of a previously injured area of a tissue, long after the injury was sustained and had healed. In lieu of fancier approaches, for a number of reasons (the autofluorescence of human autopsy tissue, limited access to good tissue, and time) a conservative approach was warranted. This meant single-marker IHC with a hematoxylin nuclear counter-stain in serial sections. As such, after whole slide images were collected, it was absolutely critical we register the staining that delineated where in the tissue the injury had once occurred, vs where was totally normally and always healthy. Once we could overlay this "map", it was trivial to segment the tissue into always healthy and not always healthy and the characterize the expression patterns of our marker.  <p>
   

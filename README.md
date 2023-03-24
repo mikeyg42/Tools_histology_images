@@ -1,4 +1,4 @@
-# Image Processing Tools for Whole Slide Imaging Brightfield Histology %/n
+# Image Processing Tools for Whole Slide Images of Brightfield Histology
 
 <p>% ----------------------------------------------------%<p>
 <p>Welcome to my repo! My name is Michael Glendinning, and here you will find a collection of some of the MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology).<p>

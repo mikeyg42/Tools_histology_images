@@ -65,7 +65,7 @@ xcoords_movingCheby = ChebyshevNodes(PointsRotated_move(1,1), PointsRotated_move
 %       5      sine wave. }
 
 %next we fit the curve to the entirety of edges data (1st step of FITTHECURVE is a subsampling...)
-[curveFcn_M, derivM] = fitTheCurve(PointsRotated_move(:, 1), PointsRotated_move(:, 2), cornerN, "Moving");
+[curveFcn_M, derivM] = fitTheCurve(movingIm, PointsRotated_move(:, 1), PointsRotated_move(:, 2), cornerN, "Moving");
 
 % 5. use curve to project the Chebychev nodes and find estimated y
 y_Cheb_m = feval(curveFcn_M, xcoords_movingCheby);
@@ -85,7 +85,7 @@ theta2 = atan2d(norm(cross([vec3, 0],[vec4, 0])),dot(vec3,vec4)); %gives the CLO
 PointsRotated_fix = rotate_CCW_around_a_point(PointsToFit_fix, -theta2, PointsToFit_fix(end, 1:2));
 
 xcoords_fixedCheby = ChebyshevNodes(PointsRotated_fix(1,1), PointsRotated_fix(end, 1), pointsPerSide);
-[curveFcn_F, derivF] = fitTheCurve(PointsRotated_fix(:, 1), PointsRotated_fix(:, 2), cornerN, "Fixed");
+[curveFcn_F, derivF] = fitTheCurve(movingIm, PointsRotated_fix(:, 1), PointsRotated_fix(:, 2), cornerN, "Fixed");
 y_Cheb_f = feval(curveFcn_F, xcoords_fixedCheby);
 final_Points_F = rotate_CCW_around_a_point([xcoords_fixedCheby; y_Cheb_f]', theta2, PointsToFit_fix(end, 1:2));
 

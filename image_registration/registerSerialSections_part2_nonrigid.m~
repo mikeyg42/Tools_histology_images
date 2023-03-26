@@ -110,16 +110,16 @@ distancefromcurvetopolygon_f = zeros(pointsPerSide, 1,'double');
 counter = 1;
 for cornerN = 1:4
 %corners are numbered 1 -> 4 CW starting in top left. edges are named by the corners they span. 1-2, 2-3, 3-4, and 4-1.    
-% cornerN_Plus1 = cornerN + 1;
-% if cornerN_Plus1==5
-%     cornerN_Plus1 = 1;
-% end
+cornerN_Plus1 = cornerNum + 1;
+if cornerN_Plus1==5
+    cornerN_Plus1 = 1;
+end
 
 PointsToFit_move =  coordXY_pgon_move_splitsides(cornerN).points;
 PointsToFit_fix = coordXY_pgon_fixed_splitsides(cornerN).points;
     
     %% call the curve fitting script
-    pointData  = curveFittingOfTissueBorders(pointsPerSide,cornerN, PointsToFit_move, PointsToFit_fix, IMG_gray, MOVING_gray);
+    pointData  = curveFittingOfTissueBorders(pointsPerSide, PointsToFit_move, PointsToFit_fix, IMG_gray, MOVING_gray);
     
 %%
     xy_moving= pointData(1).xyPoints; 

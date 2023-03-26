@@ -1,11 +1,10 @@
-function arcLen = arcLength(xQueryPoints, yValues)
-%using the sqrt(1+(dy/dx)^2) formula for arc length but dy/dx is calculated
+function arcLength = arcLength(deriv, x1, xEnd)
+%using the integral of sqrt(1+(dy/dx)^2) formula for arc length
 
-dydxv=diff(yValues)./diff(xQueryPoints); %linear spline between each node (this vectorized form of y(i+1)-yi divided by x(i+1)-xi
+% Define the integrand function
+integrand = @(x) sqrt(1 + deriv(x).^2);
 
-m = length(xQueryPoints);
-dydxv(m) = dydxv(m-1);
+% Use quadgk to numerically integrate the integrand over the interval
+arcLength = integral(integrand, min(x1, xEnd), max(x1, xEnd));
 
-integrand = sqrt(1+dydxv.*dydxv);
-arcLen = trapz(xQueryPoints,integrand);
-    end
+

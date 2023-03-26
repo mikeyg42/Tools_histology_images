@@ -74,7 +74,7 @@ leastSquareCostFcn = @(b) sum((sineFit(b,x) - y).^2);   % This is the Least-Squa
 L = min(x(1), x(end));
 R = max(x(1), x(end));
 
-polynomFit4 = @(x, coeffs) coeff(1)*(x-L).*(x-R).*(x-coeff(2)).*(x-coeff(3));
+polynomFit4 = @(x, coeff) coeff(1)*(x-L).*(x-R).*(x-coeff(2)).*(x-coeff(3));
 ordLeastSquaresCostFcn = @(coeff) sum((polynomFit4(x, coeff) - y).^2);
 
 % add constraints to set L to be the lowest root and R to be the largest root
@@ -83,12 +83,11 @@ nonlinear_constraints = @(coeff) deal([], [coeff(2) - L; R - coeff(2); coeff(3) 
 % make the initial guesses evenly distributed between L and R
 initial_guess = [1, (L+R)/3, (L+R)/1.5]; 
 
-% optimize using fmincon and the SQP algorithm
-
 %opts = optimoptions('fmincon','Algorithm','sqp','Display','none');
-opts = optimset(@fmincon, 'Display','none','TolX',1e-6,'TolFun',1e-6);
+opts = optimset(@fmincon);
+opts = optimset(opts,'Display','none', 'TolX',1e-6,'TolFun',1e-6);
 
-coeffss = fmincon(ordLeastSquaresCostFcn, initial_guess, [], [], [], [], [], [], nonlinear_constraints, opts);
+coeff = fmincon(ordLeastSquaresCostFcn, initial_guess, [], [], [], [], [], [], nonlinear_constraints, opts);
 
 
 

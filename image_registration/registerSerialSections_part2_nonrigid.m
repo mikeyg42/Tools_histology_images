@@ -4,22 +4,24 @@ function [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(var
 %% Part 2 of registration: nonrigid geometric transformation with control points placed EXCLUSIVELY programically .
 % name of the game is placing control points programmically, and with great care.
 
-%Using these points, I try 3 different nonrigid registration (LWH /2deg+3deg polynomial) techniques. 
+%Using these points, I try 3 different nonrigid registration (LWH /2deg+3deg polynomial) techniques.
 % After user picks the best of those, I follow up with a quick call of Thirion's demons
 % algorithm, after which, images are usually very much aligned smoothly. registration is
-% applied simultaneously to the image and its mask. 
+% applied simultaneously to the image and its mask.
 
 %Michael Glendinning, 2023
-% note - some aspects of this script are still a work in progress! They are actively being
-% worked on however.
+% note - this code works and does so quickly!  but I need I have not finished testing a
+% full cohort to see how it handles diversity!
 
+
+tic;
 
 id = 'MATLAB:polyshape:repairedBySimplify';
 warning('off', id);
 
-%% load up variables saved 
+%% load up variables saved
 if nargin ~= 3
-    ld = load('/Users/jglendin/Dropbox - Michael/Dropbox/human ms code/my code/registration_data_B_EGFL7_PLP.mat',...
+    ld = load('/your/Dir/registration_data_sampleID_stain1_stain2.mat',...
         '-mat');
     myNEWimages = ld.images_part1;
     fixedMat = ld.fixedMat;
@@ -45,22 +47,24 @@ IMG_gray(~IMG_mask) = 1;
 %----------------------------------------------------------------------------
 
 B = bwboundaries(IMG_mask, 'noholes');
-cxp = B{1}(:,2);
-cyp = B{1}(:,1);
+bxp = B{1}(:,2);
+byp = B{1}(:,1);
 
-pgon_fixed = polyshape(cxp, cyp, 'SolidBoundaryOrientation', 'cw');
-pgon_fixed = simplify(pgon_fixed,'KeepCollinearPoints',1);
-pgon_fixed = rmholes(pgon_fixed); 
-
-% +++++++++ NOW THE MOVING IMAGE
+pgon_fixed_nosimp = polyshape(bxp, byp, 'SolidBoundaryOrientation', 'cw'); % "cw" for clockwise
+pgon_fixed = rmholes(pgon_fixed_nosimp);
+%pgon_fixed = simplify(pgon_fixed_nosimp,'KeepCollinearPoints',1);
+%----------------------------------------------------------------------------
+% ...now do the moving image
+%----------------------------------------------------------------------------
 
 A = bwboundaries(MOVING_mask, 'noholes');
 axp = A{1}(:,2);
 ayp = A{1}(:,1);
 
-pgon_move = polyshape(axp, ayp, 'SolidBoundaryOrientation', 'cw');
-pgon_move = simplify(pgon_move,'KeepCollinearPoints',1);
-pgon_move = rmholes(pgon_move); 
+pgon_move_nosimp = polyshape(axp, ayp, 'SolidBoundaryOrientation', 'cw');
+pgon_move = rmholes(pgon_move_nosimp);
+%pgon_move = simplify(pgon_move_nosimp,'KeepCollinearPoints',1);
+
 
 %-----------
 % QUERY your turning distance to evaluate if everything is working...
@@ -70,248 +74,102 @@ pgon_move = rmholes(pgon_move);
 % end
 
 %----------------------------------------------------------------------------
-%% these polygons are not quite identical to mask. Therefore we need to adjust the corner points
-% we want our corners back because we will use them considerably more
+%% We need to adjust the corner points because they need to be perfect and the past few steps might've caused minor shifts
 
+%movingMat/FixedMat has the cornerpoints, and pgon is the most recent pgon
 cornerIndxMoving = nearestvertex(pgon_move, movingMat(1:4,:));
+cornerIndxFixed = nearestvertex(pgon_fixed, fixedMat(1:4,:));
+
+%----------------------------------------------------------------------------
+% we are now subdividing the edges of each poygon into 4 contiguous pieces
+% (delineaated by our favorite corner points, naturally).
+%----------------------------------------------------------------------------
+
+% the astute observer might notice that the cumulative length of these arrays of vertices
+% is four greater than the initial array. this is because each array will have one of our
+% corners doubled up. we will rectify this later on, but for now its a good thing.
 
 coordXY_pgon_move_splitsides(1).points = [pgon_move.Vertices(cornerIndxMoving(2, :):end,:);pgon_move.Vertices(1: cornerIndxMoving(1, :),:)];
 coordXY_pgon_move_splitsides(2).points = pgon_move.Vertices(cornerIndxMoving(1, :): cornerIndxMoving(4, :),:);
 coordXY_pgon_move_splitsides(3).points = pgon_move.Vertices(cornerIndxMoving(4, :): cornerIndxMoving(3, :),:);
 coordXY_pgon_move_splitsides(4).points = pgon_move.Vertices(cornerIndxMoving(3, :): cornerIndxMoving(2, :),:);
-% the astute observer might notice that the cumulative length of these arrays of vertices
-% is four greater than the initial array. this is because each array will have one of our
-% corners doubled up. we will rectify this later on, but for now its a good thing.
-
-cornerIndxFixed = nearestvertex(pgon_fixed, fixedMat(1:4,:));
 
 coordXY_pgon_fixed_splitsides(1).points = [pgon_fixed.Vertices(cornerIndxFixed(2, :):end,:);pgon_fixed.Vertices(1: cornerIndxFixed(1, :),:)];
 coordXY_pgon_fixed_splitsides(2).points = pgon_fixed.Vertices(cornerIndxFixed(1, :): cornerIndxFixed(4, :),:);
 coordXY_pgon_fixed_splitsides(3).points = pgon_fixed.Vertices(cornerIndxFixed(4, :): cornerIndxFixed(3, :),:);
 coordXY_pgon_fixed_splitsides(4).points = pgon_fixed.Vertices(cornerIndxFixed(3, :): cornerIndxFixed(2, :),:);
 
+%% Use curve fitting to place a LOT of perfect, amazing, leader points
+%% (i.e. control points programmically positioned evenly along the entire edge of the tissue.
+% Because we've already coarse aligned the images, these points should be well
+% aligned across images...
 
-%% Use curve fitting to place evenly spaced points along each edge of the tissue
 
+%------- SET NUM POINTS ALONG AN EDGE---------------------------------------------------------------------
+pointsPerSide = 20;
 
-%% SET NUM POINTS ALONG AN EDGE
-pointsPerSide = 15; % multiplied by 4 +9 gives total CP's
+% this value x4 and +9 (to account for 3x3 grid of middle points),
+% this sum will equal our maximum # control points. (e.g. if 15 points per side, we will
+% have 69 total control points)
+%----------------------------------------------------------------------------
+
 %%
-%preallocate
-evenlydistMoving = zeros(pointsPerSide*4,2, 'double'); 
+%preallocate for the big loop
+evenlydistMoving = zeros(pointsPerSide*4,2, 'double');
 evenlydistFixed = zeros(pointsPerSide*4,2,'double');
-MovingPolynomialVals =zeros(pointsPerSide*4,2,'double'); 
-FixedPolynomialVals = zeros(pointsPerSide*4,2,'double');
-distancefromcurvetopolygon_m = zeros(pointsPerSide, 1,'double');
-distancefromcurvetopolygon_f = zeros(pointsPerSide, 1,'double');
+midGrid_m{4} = zeros(3,2);
+midGrid_f{4} = zeros(3,2);
 
-%% ||~~~~-~~~~||~~ START of HUGE LOOP ~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~
+%% ||~~~~-~~~~||~~~~-~~~~|| START of HUGE LOOP ||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||
+%%      ||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||
 
 counter = 1;
 for cornerN = 1:4
-%corners are numbered 1 -> 4 CW starting in top left. edges are named by the corners they span. 1-2, 2-3, 3-4, and 4-1.    
-% cornerN_Plus1 = cornerN + 1;
-% if cornerN_Plus1==5
-%     cornerN_Plus1 = 1;
-% end
-
-PointsToFit_move =  coordXY_pgon_move_splitsides(cornerN).points;
-PointsToFit_fix = coordXY_pgon_fixed_splitsides(cornerN).points;
     
-    %% call the curve fitting script
-    pointData  = curveFittingOfTissueBorders(pointsPerSide,cornerN, PointsToFit_move, PointsToFit_fix, IMG_gray, MOVING_gray);
+    PointsToFit_move =  coordXY_pgon_move_splitsides(cornerN).points;
+    PointsToFit_fix = coordXY_pgon_fixed_splitsides(cornerN).points;
     
-%%
-    xy_moving= pointData(1).xyPoints; 
-    xy_fixed = pointData(2).xyPoints;
+    %~~~~-~~~~||~~~~-~~~~||~call the curve fitting script!||~~~~-~~~~||~~~~-~~~~||
     
-    MovingPolynomialVals(counter:counter+pointsPerSide-1,:) = xy_moving(1:end-1,:);
-    FixedPolynomialVals(counter:counter+pointsPerSide-1,:) = xy_fixed(1:end-1,:);   
+[pointData]  = curveFittingOfTissueBorders(pointsPerSide,cornerN, PointsToFit_move, PointsToFit_fix, MOVING_gray, IMG_gray);
+
+    % Q: reorder the midgrid points? ~~~~~~~-~~~~~~~~
+    %  NOPE! in old versions of the code I had to flip some of these coordinates. But in
+    %  its current form the points should be already arranged (top of matrix to bottom like so:
+    %         1  2  3 
+    %         |  |  |
+    %     3 --+--+--+-- 3
+    %     2 --+--+--+-- 2
+    %     1 --+--+--+-- 1
+    %         |  |  |
+    %         1  2  3
+    %~~~~-~~~~~~~~-~~~~~~~~-~~~~~~~~--~~~~~~~~-~~~~~~~~-~~~~~~~~-~~~~~~~~~~-~~~~~~~~~~-
+    % parsing curve fitting script results:
+    %the results of that script are a structural array (admittedly a silly choice, will change )
+
+    movingPoints = [pointData(1).xyPoints;pointData(1).middleGrid];
+    fixedPoints = [pointData(2).xyPoints;pointData(2).middleGrid];
     
-%reformat middleGridPoints, which will be at most 9 potential internal control points
-% two consecutive sides will need to be reversed order. it is arbitrary which 2
-    if cornerN == 3 || cornerN ==4
-        midGrid_m{cornerN} = flipud(pointData(1).middleGrid);
-        midGrid_f{cornerN} = flipud(pointData(2).middleGrid);
-    else
-        midGrid_m{cornerN} = pointData(1).middleGrid;
-        midGrid_f{cornerN} = pointData(2).middleGrid;
-    end
-
-%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
-movingContour = [A(:,2), A(:,1)];
-fixedContour =  [B(:,2), B(:,1)];
-
-    for jj = 1:pointsPerSide %first and last corner we just MAKE be the corners
-        if jj == 1
-            xy_moving(jj, 1:2) = starting;
-            xy_fixed(jj, 1:2) = startingF;
-            continue;
-            
-        elseif jj == pointsPerSide
-            xy_moving(jj, 1:2) = ending; % the "last" point SHOULD ALWAYS be the next corner point! but we wait to get rid of it til end of loop!
-            xy_fixed(jj, 1:2) = endingF; 
-            continue;
-            
-        elseif mod(cornerN, 2) == 1  
-            flagg = 1; 
-            c=0;
-            while flagg == 1
-            indx_m = find(movingContour(:,1) == round(xy_moving(jj, 1)));
-            
-            nPts_m = numel(indx_m); % number of intersections of your xy_moving point with contour
-                switch nPts_m
-                    case 0
-                        c = c+1;
-                        xy_moving(jj, 1) = round(xy_moving(jj, 1)+0.6); %shift the x coordinate, then try again
-                        flagg = 1; %NOT DONE
-                    case 1
-                        distancefromcurvetopolygon_m(jj, 1) = pdist2(xy_moving(jj, 1:2), movingContour(indx_m, 1:2), 'euclidean');
-                        xy_moving(jj, 2) = movingContour(indx_m, 2); %set the 
-                        flagg=2; %DONE
-                    otherwise % ie. " > 1 " THIS IS MOST CASES!!!!
-                        hits = movingContour(indx_m,1:2);
-                        [distances, Id_multi] = pdist2(hits, xy_moving(jj,1:2), 'euclidean', 'Smallest', 1);
-                        distancefromcurvetopolygon_m(jj, 1) = distances(1, 1);
-                        xy_moving(jj, 2) = hits(Id_multi,2);
-                        flagg = 2; %DONE
-                end
-                if c > 20 && c<51
-                    xy_moving(jj,1) = round(xy_moving(jj, 1)-40);
-                elseif c>50
-                    disp('there is an issue aligning points to contour in moving image');
-                    return
-                end
-            end
-% ^ moving            
-%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
-% v fixed
-
-            flage = 1;
-            c=0;
-            while flage ==1
-                indx_f = find(fixedContour(:,1) == round(xy_fixed(jj, 1)));
-                nPts_f = numel(indx_f);
-                switch nPts_f
-                    case 0
-                        c=c+1;
-                        xy_fixed(jj, 1) = round(xy_fixed(jj, 1)+0.6); 
-                        flage = 1; %NOT DONE
-                    case 1
-                        distancefromcurvetopolygon_f(jj, 1) = pdist2(xy_fixed(jj, 1:2), fixedContour(indx_f, 1:2), 'euclidean');
-                        xy_fixed(jj, 2) = fixedContour(indx_f,2);
-                        flage = 2; %DONE
-                    otherwise % ie. " > 1 "
-                        hitts = fixedContour(indx_f,1:2);
-                        [distys, Id2_multi] = pdist2(hitts, xy_fixed(jj, 1:2), 'euclidean', 'Smallest', 1);
-                        distancefromcurvetopolygon_f(jj, 1) = distys(1, 1);
-                        xy_fixed(jj, 2) = hitts(Id2_multi,2);
-                        flage = 2; %DONE
-                end
-                if c > 20 && c<51
-                    xy_fixed(jj,1) = round(xy_fixed(jj, 1)-40);
-                elseif c>50
-                    disp('there is an issue aligning points to contour in fixed image');
-                    return
-                end
-            end
-  %                                            ^ ^
-  % -=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-|%|-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
-  % +-=%=-+-=%=-+-=% this is identical to the above,with x and y coordinates swapped %=-+-=%=-+-
-  % -+-=%=-+-=%=-+-=%|-|-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+
-  %                  V V          
-        elseif mod(cornerN, 2) == 0 %ie QQ = 2 or 4  
-            
-            flaggy =1;
-            c=0;
-            while flaggy ==1
-            indx_f = find(fixedContour(:,2) == round(xy_fixed(jj, 2)));
-            nPts_f = numel(indx_f);
-                switch nPts_f
-                    case 0
-                        c=c+1;
-                        xy_fixed(jj, 2) = round(xy_fixed(jj, 2)+0.6); 
-                        flaggy = 1; %NOT DONE
-                    case 1
-                        distancefromcurvetopolygon_f(jj, 1) = pdist2(xy_fixed(jj, 1:2), fixedContour(indx_f, 1:2), 'euclidean');
-                        xy_fixed(jj, 1) = fixedContour(indx_f,1);
-                        flaggy=2;
-                    otherwise % ie. " > 1 "
-                        hits = fixedContour(indx_f,1:2);
-                        [dists, Id_multi] = pdist2(hits, xy_fixed(jj, 1:2), 'euclidean', 'Smallest', 1);
-                        distancefromcurvetopolygon_f(jj, 1) = dists(1, 1);
-                        xy_fixed(jj, 1) = hits(Id_multi,1);
-                        flaggy=2;
-                end
-                if c > 20 && c<51
-                    xy_fixed(jj,1) = round(xy_fixed(jj, 1)-40);
-                elseif c>50
-                    disp('there is an issue aligning points to contour in fixed image');
-                    return
-                end
-            end
-% ^ fixed             
-%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
- % v moving
-            flags = 1;
-            c=0;
-            while flags == 1
-            indx_m = find(movingContour(:,2) == round(xy_moving(jj, 2)));
-            nPts_m = numel(indx_m);
-                switch nPts_m
-                    case 0
-                        c=c+1;
-                        xy_moving(jj, 2) = round(xy_moving(jj, 2)+0.6); 
-                        flags = 1; %NOT DONE
-                    case 1
-                        distancefromcurvetopolygon_m(jj, 1) = pdist2(xy_moving(jj, 1:2), movingContour(indx_m, 1:2), 'euclidean');
-                        xy_moving(jj, 1) = movingContour(indx_m,1);
-                        flags=2;
-                    otherwise % ie. " > 1 "
-                        hits = movingContour(indx_m,1:2);
-                        [distance, Id_multi] = pdist2(hits, xy_moving(jj, 1:2), 'euclidean', 'Smallest', 1);
-                        distancefromcurvetopolygon_m(jj, 1) = distance(1, 1);
-                        xy_moving(jj, 1) = hits(Id_multi,1);
-                        flags=2;
-                end
-            end 
-            if c > 20 && c<51
-                 xy_moving(jj,1) = round(xy_moving(jj, 1)-40);
-            elseif c>50
-                 disp('there is an issue aligning points to contour in moving image');
-                 return
-             end
-        end
- %=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
-    end %end looping through points
-    clear flag*
+    %=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=%=-+-=
     
-    %% read out avg residual
-    fixed_residuals = sum(distancefromcurvetopolygon_f(:))/pointsPerSide;
-    moving_residuals = sum(distancefromcurvetopolygon_m(:))/pointsPerSide;
-   
-    disp(strcat('FIXED: Avg. distance from point to curve: ', num2str(fixed_residuals)));
-    disp(strcat('MOVING: Avg. distance from point to curve: ', num2str(moving_residuals)));
-
-    %% 
-    evenlydistMoving(counter:counter+pointsPerSide-1,:) = xy_moving(1:end-1,:);
-    evenlydistFixed(counter:counter+pointsPerSide-1,:) = xy_fixed(1:end-1,:);
+    midGrid_m{cornerN} = movingPoints(end-2:end,:);
+    midGrid_f{cornerN} = fixedPoints(end-2:end,:);
+       
+    evenlydistMoving(counter:counter+pointsPerSide-1,:) = movingPoints(1:pointsPerSide,:);
+    evenlydistFixed(counter:counter+pointsPerSide-1,:) = fixedPoints(1:pointsPerSide,:);
     
     counter = counter+pointsPerSide;
 end
-%% ||~~~~-~~~~||~~ END HUGE LOOP ~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~
+%% ||~~~~-~~~~||~~ END LOOP ~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~
 
-cPointsMoving = cpcorr(evenlydistMoving, evenlydistFixed, MOVING_gray, IMG_gray);
-cPointsFix = cpcorr(evenlydistFixed, cPointsMoving, IMG_gray, MOVING_gray);
+%% Now use middle Grid points to locate 9 internal control points
 
-%% Now use middle Grid points to define the internal control points
-
-mside1 = [midGrid_m{1};fliplr(midGrid_m{2})];
-mside2 = [flipud(midGrid_m{3});flipud(fliplr(midGrid_m{4}))];
+mside1 = [midGrid_m{1};midGrid_m{2}];
+mside2 = [midGrid_m{3};midGrid_m{4}];
 gridpoints_m = [mside1, mside2];
 
-fside1 = [midGrid_f{1};fliplr(midGrid_f{2})];
-fside2 = [flipud(midGrid_f{3});flipud(fliplr(midGrid_f{4}))];
+fside1 = [midGrid_f{1}; midGrid_f{2}];
+fside2 = [midGrid_f{3}; midGrid_f{4}];
 gridpoints_f = [fside1,fside2];
 
 moving_coordinates = solveForGridPoints(gridpoints_m);
@@ -321,11 +179,12 @@ cp_moving = [cPointsMoving; moving_coordinates];
 cp_fixed = [cPointsFix; fixed_coordinates];
 
 %% Refine control points placement as necessary using this GUI!
+close all force
 [cp_moving, cp_fixed] = visualizeControlPoints_andResetManually(cp_moving, cp_fixed, MOVING_gray, IMG_gray);
 
- close all force
- figure;
- showMatchedFeatures(MOVING_gray, IMG_gray, cp_moving, cp_fixed);
+close all 
+figure;
+showMatchedFeatures(MOVING_gray, IMG_gray, cp_moving, cp_fixed);
 
 %% NOW WE USE CPOINTS TO DEFINE 3x Geometric nonrigid transformations
 
@@ -334,12 +193,14 @@ MOVING_gray = imhistmatch(MOVING_gray, IMG_gray);
 
 nP = round(length(cp_moving)*0.9); %number of points to include in the local weighted means
 if nP>=7
-tform1_lwn = cp2tform(cp_moving, cp_fixed, 'lwm', nP);
-tform2_poly2 = cp2tform(cp_moving, cp_fixed, 'polynomial', 2);
-tform3_poly3 = cp2tform(cp_moving, cp_fixed, 'polynomial', 3);
+    tform1_lwn = cp2tform(cp_moving, cp_fixed, 'lwm', nP);
 else
-    disp('issue');
+    nP = length(cp_moving)-1; %i.e. just shy of 100% my reasoning being even if you have zero edge points, 9 interior points -1 is still > 8 7
+    tform1_lwn = cp2tform(cp_moving, cp_fixed, 'lwm', nP);
 end
+    tform2_poly2 = cp2tform(cp_moving, cp_fixed, 'polynomial', 2);
+    tform3_poly3 = cp2tform(cp_moving, cp_fixed, 'polynomial', 3);
+
 
 imReg1 = imtransform(MOVING_gray,tform1_lwn,'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1, 'FillValue', 1);
 imReg2 = imtransform(MOVING_gray,tform2_poly2,'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1,'FillValue', 1);
@@ -350,14 +211,14 @@ choice = evaluate3nonRigidTransformations(imReg1, imReg2, imReg3, IMG_gray);
 
 switch choice
     case 11
-    nearlyRegisteredMovingImage = imReg1;
-    tform = tform1_lwn;
+        nearlyRegisteredMovingImage = imReg1;
+        tform = tform1_lwn;
     case 22
-    nearlyRegisteredMovingImage = imReg2;
-    tform = tform2_poly2;
+        nearlyRegisteredMovingImage = imReg2;
+        tform = tform2_poly2;
     case 33
-    nearlyRegisteredMovingImage = imReg3;
-    tform = tform3_poly3;
+        nearlyRegisteredMovingImage = imReg3;
+        tform = tform3_poly3;
 end
 
 MOVINGMaskReg = imtransform(MOVING_mask, tform, 'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1, 'FillValue', 0);
@@ -365,21 +226,29 @@ MOVINGMaskReg = imtransform(MOVING_mask, tform, 'Xdata',[1 size(MOVING_mask,2)],
 %turn the warning back on you turned off at the beginning of the function
 warning('on', id);
 
-%close anything still open and be sure theyre really closed 
+%close anything still open and be sure theyre really closed
 close all force
 pause(0.5);
 
-%% FINAL REGISTRATION STEP!! Diffeomorphic demons 
+%% FINAL REGISTRATION STEP!! Diffeomorphic demons
 [D, M_Im] = imregdemons(nearlyRegisteredMovingImage, IMG_gray, [500, 320, 100, 20], 'PyramidLevels', 4, 'DisplayWaitbar', false);
 
 sumUnmovedMask = sum(sum(MOVINGMaskReg));
 movedMask = imwarp(MOVINGMaskReg, D);
 
-propPixelsLeft = sum(sum(MOVINGMaskReg & movedMask))/sumUnmovedMask; % the smaller the more movement
-cc= corrcoef(M_Im,nearlyRegisteredMovingImage);
-disp(num2str(cc), num2str(propPixelsLeft));
+%propPixelsLeft = sum(sum(MOVINGMaskReg & movedMask))/sumUnmovedMask; % the smaller the more movement
+cc1= corrcoef(M_Im,nearlyRegisteredMovingImage);
+cc2= corrcoef(movedMask, IMG_mask);
+remainingMovement = sum(sum(~movedMask & IMG_mask))/ sum(sum(IMG_mask));
 
-%% Visualization #3
+disp(strcat(' correlation between images ', num2str(cc1), 'and between masks its: ', num2str(cc2)));
+disp(strcat(num2str(remainingMovement), ' remaining movement, expressed as a percentage of the fixed mask'));
+
+
+%% Visualization #3 - does not work yet!!!
+
+
+
 
 f3 = uifigure;
 gl_3 = uigridlayout(f3, [3,3]);
@@ -388,7 +257,7 @@ butClose = uibutton(gl_3,'push', ...
     'Text','Close The Visualization?',...
     'ButtonPushedFcn', @(~,~) butCloseFcn);
 
-butClose.Layout.Row = 2;butClose.Layout.Column = 2;
+butClose.Layout.Row = 2; butClose.Layout.Column = 2;
 
 axImgs = uiaxes(gl_3);  title(axImgs, 'Fixed and Moving Images')
 axMasks = uiaxes(gl_3); title(axMasks, 'Fixed and Moving MASKS')
@@ -489,23 +358,23 @@ setappdata(0, 'mySelection', []);
 end
 
 function button1Callback(~, ~)
-    setappdata(0, 'mySelection', 11);
+setappdata(0, 'mySelection', 11);
 
-    uiresume;
+uiresume;
 
 end
 
 function button2Callback(~, ~)
-    setappdata(0, 'mySelection', 22);
-    
-    uiresume;
+setappdata(0, 'mySelection', 22);
+
+uiresume;
 
 end
 
 function button3Callback(~, ~)
-    setappdata(0, 'mySelection', 33);
-    
-    uiresume;
+setappdata(0, 'mySelection', 33);
+
+uiresume;
 
 end
 
@@ -532,71 +401,73 @@ hold off;
 disp('Please click on any misaligned control points to adjust their position. Press any key when finished.');
 
 while true
-    [x, y, button] = ginput(1);
-    if button ~= 1 || size([x,y], 1)==0 || size([x,y], 2) ==0 % exit loop if button other than left-click is pressed
+    [x, y, butt] = ginput(1);
+    if butt ~= 1 || any(size([x,y])==0) % exit loop if button other than left-click is pressed
         return;
     else
-    
-    % Find the nearest control point to the clicked position
-    try
-    distances = sqrt(sum(bsxfun(@minus, [x y], cp).^2, 2));
-    catch
-        return
-    end
-    [~, idx] = min(distances);
-    
-    
-    % Determine which set of control points the selected point belongs to
-    if idx <= sz
-        curr_cp = cp(1: sz, 1:2);
-        flag = 1;
-        %  curr_h = h_moving;
-    elseif idx > sz
-        curr_cp = cp(sz+1:end, 1:2);
-        flag = 2;
-        %curr_h = h_fixed;
-        idx = idx - sz;
-    end
-    oldx = curr_cp(idx, 1);
-    oldy = curr_cp(idx, 2);
-    
-    
-    cla;
-    imshowpair(MOVING_gray, IMG_gray, 'blend');
-    %instead of deleting the point and messing up our index values. we just
-    %move it out of frame,
-    if flag == 1
-        cp(idx, 1:2) = [-10, -10];
-    else
-        cp(idx+sz, 1:2)= [-10, -10];
-    end
-    
-    %replot without that 1 point
-    hold on
-    plot(cp(1:sz,1), cp(1:sz,2), [colors{1} '*'], 'MarkerSize', 10);
-    plot(cp(sz+1:2*sz,1), cp(sz+1:2*sz,2), [colors{2} '*'], 'MarkerSize', 10);
-    %replace the old point a blue marker as filler
-    hOld = plot(oldx, oldy, 'bo', 'MarkerSize', 10);
-    hold off
-    
-    % Prompt the user to adjust the control point's position
-    new_pos = ginput(1);
-    ff.Visible = 'off';
-    [ii, ~] = find(cp<0, 1, 'first'); % find the first negative value of cp, whould should be your point
-    %assin the new value of the replaced coordinate into cp
-    cp(ii, :) = new_pos(1:2);
-    
-    delete(hOld);
-    cla; imshowpair(MOVING_gray, IMG_gray, 'blend');
-    hold on;
-    plot(cp(1:sz,1), cp(1:sz,2), [colors{1} '*'], 'MarkerSize', 10);
-    plot(cp(sz+1:2*sz,1), cp(sz+1:2*sz,2), [colors{2} '*'], 'MarkerSize', 10);
-    hold off;
-    ff.Visible = 'on';
+        
+        % Find the nearest control point to the clicked position
+        try
+            distances = sqrt(sum(bsxfun(@minus, [x y], cp).^2, 2));
+        catch
+            return
+        end
+        [~, idx] = min(distances);
+        
+        
+        % Determine which set of control points the selected point belongs to
+        if idx <= sz
+            curr_cp = cp(1: sz, 1:2);
+            flag = 1;
+            %  curr_h = h_moving;
+        elseif idx > sz
+            curr_cp = cp(sz+1:end, 1:2);
+            flag = 2;
+            %curr_h = h_fixed;
+            idx = idx - sz;
+        end
+        oldx = curr_cp(idx, 1);
+        oldy = curr_cp(idx, 2);
+        
+        
+        cla;
+        imshowpair(MOVING_gray, IMG_gray, 'blend');
+        %instead of deleting the point and messing up our index values. we just
+        %move it out of frame,
+        if flag == 1
+            cp(idx, 1:2) = [-10, -10];
+        else
+            cp(idx+sz, 1:2)= [-10, -10];
+        end
+        
+        %replot without that 1 point
+        hold on
+        plot(cp(1:sz,1), cp(1:sz,2), [colors{1} '*'], 'MarkerSize', 10);
+        plot(cp(sz+1:2*sz,1), cp(sz+1:2*sz,2), [colors{2} '*'], 'MarkerSize', 10);
+        %replace the old point a blue marker as filler
+        hOld = plot(oldx, oldy, 'bo', 'MarkerSize', 10);
+        hold off
+        
+        % Prompt the user to adjust the control point's position
+        new_pos = ginput(1);
+        ff.Visible = 'off';
+        [ii, ~] = find(cp<0, 1, 'first'); % find the first negative value of cp, whould should be your point
+        %assin the new value of the replaced coordinate into cp
+        cp(ii, :) = new_pos(1:2);
+        
+        delete(hOld);
+        cla; imshowpair(MOVING_gray, IMG_gray, 'blend');
+        hold on;
+        plot(cp(1:sz,1), cp(1:sz,2), [colors{1} '*'], 'MarkerSize', 10);
+        plot(cp(sz+1:2*sz,1), cp(sz+1:2*sz,2), [colors{2} '*'], 'MarkerSize', 10);
+        hold off;
+        ff.Visible = 'on';
     end
     clear x y
 end
 cp_moving = cp(1:size(cp_moving, 1),1:2);
 cp_fixed = cp(size(cp_moving, 1)+1:end,1:2);
 end
+
+
 

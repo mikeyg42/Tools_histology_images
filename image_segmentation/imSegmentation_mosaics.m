@@ -78,7 +78,8 @@ clear all
 
     % 1. Set your scale factor. The closer to 1 the better! If you
     % experience crashing or painfully slow processing, raise this.
-scaleFactor = 2.8;  
+scaleFactor = 2.8; 
+resizeBig = false; %(this indicates you'd like to resize it to be fullsized upon save.) 
     
     % 2. Define the file formats in which raw images will use the following
     % extensions:1.4 or
@@ -90,8 +91,8 @@ deleteYES = true;
     
     % 4. set these directory locations for your local data storage
     % NOTE: you MUST include the file seperator "/" at the end of each path...
-directoryImages = '/Users/YOUR/DIR_1/';
-directorytoSaveInto = '/Users/YOUR/DIR_2/';
+directoryImages = '/Users/jglendin/Desktop/LesionVibes/PLP/';
+directorytoSaveInto = '/Users/jglendin/Dropbox - Michael/Dropbox/processedMSimages/';
    
     % 5. (optiona;) Include additional text to append to each save file (
 versionNum = '_v1';
@@ -280,16 +281,22 @@ end
 %% 4. Saving!!
 
 % CAUTION: this will overwrite whatever might have been there before!!
-
+% CAUTION: sometimes MATLAB cannot handle such a huge save file!!!
 if resizeBig
     sF = 1/USETHISscaleFactor;
     finalbinaryMask = imresize(finalbinaryMask, sF, {@oscResampling, 4});
     imAdjRGB = imresize(imAdjRGB, sF, {@oscResampling, 4});
-    
+try    
 imwrite(finalbinaryMask, strcat(handy.directories.saveDir,activeFilename,'scale_1.0_', '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
     'Compression','none');
 imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'scale_1.0_', '_adjustedRGBImage', handy.versionNum ,'.tiff'), 'tiff', ...
     'Compression','none');
+catch
+   imwrite(imresize(finalbinaryMask,0.5, {@oscResampling, 4}) , strcat(handy.directories.saveDir,activeFilename,'scale_0.5_', '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
+    'Compression','none');
+imwrite(imresize(imAdjRGB, 0.5, {@oscResampling, 4}), strcat(handy.directories.saveDir, activeFilename,'scale_0.5_', '_adjustedRGBImage', handy.versionNum ,'.tiff'), 'tiff', ...
+    'Compression','none'); 
+end
 else
   imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'scale_', sprintf('%.4g', USETHISscaleFactor), '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
     'Compression','none');
@@ -302,8 +309,8 @@ if outputFlag > 0
     varargout{outputFlag} = finalbinaryMask;
 end  
 
-%/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%
-%--%--\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/<--%-->/^*^\<--%-->\v.v/
+%/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%
+%--%--\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/
         
 %% 5. (optional) move file into recycling bin
 recycle on;

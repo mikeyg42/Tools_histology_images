@@ -25,11 +25,11 @@ function registerSerialSections_part1
 %  ||    ||
 %  vv    vv     directorytosaveinto should be where you have your 
 % ======================================================================================== %
-directorywithimagefiles = '/Users/jglendin/Dropbox - Michael/Dropbox/processedMSimages/';  %
-destinationToSaveInto = '/Users/jglendin/Dropbox - Michael/Dropbox/human ms code/my code/';%
-ID = 'B'; %===========================================================================  % 
-Stain1_fixed = 'EGFL7'; %=================================================================  %
-Stain2_moving = 'PLP'; %=================================================================  %
+directorywithimagefiles = '/your/dir/images/';  %
+destinationToSaveInto = '/your/ave/Directory/';%
+ID = 'A'; %===========================================================================  % 
+Stain1_fixed = 'CD31'; %=================================================================  %
+Stain2_moving = 'MCAM'; %=================================================================  %
 % =======================================================================================  %
                
                 %% ...THE GAME IS AFOOT %%
@@ -237,7 +237,7 @@ savePath = strcat(destinationToSaveInto, 'registration_data_' , ID,'_', Stain1_f
 save(savePath, '-struct', 'data', '-v7.3', '-nocompression');
 
 %% proceed to ~part 2~
-[D, tform, m_im, movedMask] = nonRigidRegistration(fixedMat_new,movingMat_new, myNEWimages);
+[D, tform, m_im, movedMask] = reigsterSerialSections_part2_nonrigid(fixedMat_new,movingMat_new, myNEWimages);
 
 data2 = struct([]);
 data2(1).displacementField = D;

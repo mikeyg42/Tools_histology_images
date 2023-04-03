@@ -2,12 +2,14 @@ function finMask = textureFilterGUI(imgC)
 %% This function is a reliable semi-automated segmentation tool. 
 % Grayscale images are entered, and then 8 different possible binary
 % masks are generated. Most of these segmentation techniques are classic
-% in the field and implemented mo
-%   - the first image utilizes the image gradient, and is implemented based
-%   on Matlab documentation
-%   - th second image involves some manipulation of the first image to
+% in the field and implemented without substantial conceptual modifcation. In various ways
+% I set parameters optimally for my data, so if poor performance in encountered, you will
+% want to run through the code for those instances. 
+% There are 8 images to pick from:
+%   - 1. image gradient, and is implemented based on Matlab documentation
+%   - 2. some manipulation of the first image to
 %   ensure that I've segemented the largest 2.5% of blobs in the image. 
-%   - the next three images rely on 3 different means of locally filtering 
+%   - 3, 4, 5. all rely on different means of locally filtering 
 % in the spatial domain so to assess regional differences in specific textures.
 % I've kept the convolutions here at the recommended 9x9 square kernel. I
 % have entropy(areas exhibiting randomness are brighter), range (brighter =
@@ -22,7 +24,7 @@ function finMask = textureFilterGUI(imgC)
 % see : https://www.mathworks.com/matlabcentral/fileexchange/48817-svd-eigen-qr-and-lu-texture-transforms
 %    - imextendedmax and min use the distance transform between known
 %    boundary points, I think at least, and then converts to H-maxima transforms.
-%    similar to the watershed seg. algorigth
+%    similar to the watershed seg. algorigthm
 %   
 %    
 

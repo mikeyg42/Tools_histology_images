@@ -160,6 +160,7 @@ switch choice
         imgRGB = imresize(imgCurrent,rescaleFactor, {@oscResampling,4}); %gets resized after the switch-case block 
         imgGray = rgb2gray(imgRGB);
         outOfBoundsMask = textureFilterGUI(imgGray); 
+        outOfBoundsMask = imresize(outOfBoundsMask, size(imgCurrent, 1:2),{@oscResampling,4});
         
     case 'Color segment with geodesics, w/ provided foreground sample'
         outOfBoundsMask = geoProbSeg_2tone(imgCurrent);
@@ -195,9 +196,8 @@ switch choice
         outOfBoundsMask = morphologySegment(imgCurrent);
 end
 
-% SANITY CHECK - some segmentation functions I had to include an imresize call
-% because of how slow they would otherwise run...
-% and so, just in case I missed resizing, this helped me during debugging
+% Just for my sanity...
+
 outOfBoundsMaskF = imresize(outOfBoundsMask, size(imgCurrent,1:2));
 
 % similarly this is vestigal from debugging, but gives me peace of mind so its staying!

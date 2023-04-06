@@ -1,23 +1,27 @@
 function [theta_clockwise, flip_LR] = RGB_reorientationGUI(imToRotate,fixedImage)
-%% provides a template, FIXED image in one axis and adjacent to it 4 smaller versions
-%% of another image, each rotated 0º, 90ª, 180º, or 270º. 
+% syntax = [theta_clockwise, flip_LR] = RGB_reorientationGUI(imToRotate,fixedImage)
 
-close all force
+%% displays a template (ie the FIXED image) to the left in one axis, adjacent to it 
+%% a vertically stacked montage of the MOVING image, rotated;
+%% 0º, 90ª, 180º, or 270º (ordered top to bttm), with 4 accompanying buttons to select best.
+%% There is also the option to take the mirror image of the moving image 
+% NOTE: it will APPEAR as though the FIXED image is being inverted into
+% its mirror image... this is an ILLUSION! nothing more... no need to panic!
+% Please rest easy knowing any transformations will only be applied to the MOVING image. 
 
 if size(imToRotate, 3)~=3 
-    disp('input is supposed to be RGB.... stacking 3 copies of the grayscale input atop each other ');
-    imToRotate = cat(3, imToRotate,imToRotate,imToRotate);
+    disp('input is supposed to be RGB.... stacking 4 copies of the grayscale input atop each other ');
 end
 
 % we will first generate all 4 options 
-sz = size(imToRotate);
+sz = size(imToRotate, 1:2);
 BigSide = max(sz(1), sz(2)); % [size does [rows, column]... [1, 3] is 1x3 is [1, 1, 1]
 if sz(1)<sz(2) %we here INSIST nrows>ncols ie height > width
    imToRotate = rot90(imToRotate, -1); % "...make a burger.... not a hotdog."
    fixedImage = rot90(fixedImage, -1);
 end
 % redefine sz to reflect the change in height
-sz = size(imToRotate);
+sz = size(imToRotate, 1:2);
 
 % Here we construct a 4-by-1 (stacked vertically) montage of the 4
 % potential rotations that the moving image could make to match with the
@@ -28,23 +32,30 @@ imReallyLongSide = BigSide*4;
 
 %preallocate with ones..must be ONES function, otherwise you're
 %background's high contrastt will become the fixation of all computer vision... the talk of the town! 
-imag0 = ones(imBiggerSide, imBiggerSide, 3, 'double'); % is also rows/columns, i/e rows x cols
+if ndims(imToRotate) == 3
+    imag0 = ones(imBiggerSide, imBiggerSide, 3, 'double'); % is also rows/columns, i/e rows x cols
+    imag0(1:BigSide, padamt:padamt+sz(2)-1, :) = imToRotate(:,:,:);
+    rotatedImageTiled = ones(imReallyLongSide, imBiggerSide, 3, 'double');
+else
+    imag0 = ones(imBiggerSide, imBiggerSide, 1, 'double');
+    imag0(1:BigSide, padamt:padamt+sz(2)-1, 1) = imToRotate(:,:, 1);
+    rotatedImageTiled = ones(imReallyLongSide, imBiggerSide, 1, 'double');
+end
 
-imag0(1:BigSide, padamt:padamt+sz(2)-1,:) = imToRotate(:,:,:);
 % stack 4 squares into one tall rectangle image
-rotatedImageTiled = ones(imReallyLongSide, imBiggerSide, 3, class(imag0));
+
 
 rotatedImageTiled(1:imBiggerSide,:, :) = imag0;
 rotatedImageTiled(imBiggerSide+1:imBiggerSide*2, :, :) = permute(imag0(imBiggerSide:-1:1, :, :), [2 1 3]); %90degrees CW
 rotatedImageTiled(2*imBiggerSide+1:imBiggerSide*3,:, :) = imag0(imBiggerSide:-1:1,imBiggerSide:-1:1, :); %180degrees
 rotatedImageTiled(3*imBiggerSide+1:imBiggerSide*4,:, :) = permute(imag0(:,imBiggerSide:-1:1, :), [2 1 3]); %90degrees CCW
 
-% huge downsample for efficiency!!!
+% huge downsample for efficiency of displaying the GUI!!!
 rotatedImageTiled = imresize(rotatedImageTiled, 0.1);
 
-%  PLP and other stain REGISTRATION TIME
+%  OPEN the GUI
 figRotation = uifigure(1);
-setappdata(figRotation,'myRotationSelection', 0);
+
 nameArray = {'WindowState','HandleVisibility','Name','Visible','NumberTitle', 'IntegerHandle'};
 valueArray = {'normal', 'on', 'Reorientation_GUI','off', 'on', 'on'};
 set(figRotation, nameArray, valueArray);
@@ -81,10 +92,11 @@ flipButton.Layout.Column = 2;
 
 set(figRotation, 'Visible', 'on');  % the figure needs to be visible to be made always on top
 
-drawnow limitrate % updates figures, but defers any callbacks!
-
-%initialize the appdata in case for the flip 
+%initialize the appdata 
 setappdata(figRotation, 'flag', 0); %flag is for the flip LR functionality
+setappdata(figRotation,'myRotationSelection', 0); %initialize the rotation button
+
+drawnow limitrate % updates figures, but defers any callbacks!
 
 uiwait; %uiresume is hidden away in each of the button callbacks!
 
@@ -117,6 +129,8 @@ switch choiceStr
     case '4'
         theta_clockwise = 270;
 end
+
+close 2: Reorientation_GUI
 
 end
 

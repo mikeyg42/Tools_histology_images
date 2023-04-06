@@ -7,6 +7,8 @@ function themask = cleanMask(myimage, varargin)
 % input to the function is the mask, then these values of minSize and
 % minDist will be used. 
 
+% Michael Glendinning, 2023
+
 minSize = 10000;
 minDist = 250;
 % if the function was called with additional values, they can overwrite the above
@@ -35,8 +37,8 @@ end
 
 %make a list of every combination of pairings of id's to evaluate distances between
 
-list1 = repmat([1:1:idx]', idx, 1); %makes matrix like: [1 2 3 4 1 2 3 4 1 2 3 4 1 2 3 4]
-list2 = repelem([1:1:idx]', idx); % makes matrix like: [ 1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4]
+list1 = repmat([1:1:idx]', idx, 1); % (fyi transforms a matrix like [1,2,3,4] into : [1 2 3 4 1 2 3 4 1 2 3 4 1 2 3 4])
+list2 = repelem([1:1:idx]', idx); % (fyi transforms a matrix like: [1,2,3,4] into: [ 1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4])
 combos = horzcat(list1, list2); 
 
 distances = zeros(size(combos, 1), 1);

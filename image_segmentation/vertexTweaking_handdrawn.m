@@ -1,14 +1,20 @@
 function finMask  = vertexTweaking_handdrawn(outOfBoundsMask,imgCurrent, varargin)
-% I made this funciton up as a last ditch effort to refine a
-% segmentation effort. The mask is converted into a more simple shape with
-% fewer verticies using the reducepoly function, the sensativity for which
-% we carefull calibrate so that there is never more than some arbitrary number 
-% of nodes, e.g. 125 points. User then can drag each vertex around to alter segmentation. 
+% syntax: finMask  = vertexTweaking_handdrawn(outOfBoundsMask,imgCurrent) OR
+%         finMask  = vertexTweaking_handdrawn(outOfBoundsMask,imgCurrent, NUMBER_OF_NODES)
+% When automated refinements fall short, when permissible at least, one can turn to manual
+% refinement. This funciton converts a binary mask into a polygon shape (only 1). 
+% # verticies is limited using the reducepoly function, the sensativity for which
+% we can calibrate with a while-loop to match a requested input number of nodes.
+% If not supplied, function assumes value of 125 points. After polygon is drawn, 
+% it is overlaid on the RGB image, and then the user then can drag each vertex 
+% around to alter segmentation. A second GUI should also be visible giving you the option
+% to indicate you're finished refining segmentation and would like to submit. 
 
-% hidden behind the GUI is ANOTHER GUI with a prompt asking if you
-% finished yet. After that, to refine further, a small dilating and a
-% couple iterations of active contour are initiated, s.t it doesn't
-% look like jagged and handdrawn. 
+% Just drag and drop vertices to move. After submission, to smooth any jagged edges 
+% created as a result of polygon simplification, a small dilation is applied, followed
+% by a couple iterations of active contour (i.e. snakes). 
+
+% note, number of nodes is approximate, may vary by as much as 10
 
 % -Michael Glendinning, 2023
 
@@ -37,7 +43,7 @@ end
         tol = 0.0005;
         vert2 = reducepoly(largest, tol);
         while size(vert2, 1)>approx_nPoints
-            tol = tol*1.5;
+            tol = tol*1.4; %arbitrary scale factor (shrinking this value closer to 1 will increase precision, at the cost of efficiency)
             vert2 = reducepoly(largest, tol);
         end
         x = vert2(:,2);
@@ -54,10 +60,10 @@ end
         
         alertFig = uifigure;
         movegui(alertFig, 'west');
-        message= {'When you are happy with mask, press OK'};
+        message= {'When you are happy with mask refinements, press OK'};
         uialert(alertFig, message, 'Confirm',...
             'Icon', 'question', 'Modal', false,...
-            'CloseFcn', @buttsCallback);
+            'CloseFcn', @buttCallback);
         uiwait;
         
         outOfBoundsMask_temp = createMask(roi, imgCurrent);
@@ -76,7 +82,6 @@ end
 
 end
 
-function buttsCallback(~, ~)
-    
+function buttCallback(~, ~)
     uiresume;
 end

@@ -1,13 +1,11 @@
 # Image Processing Tools for Whole Slide Images of Brightfield Histology
 <p>% ----------------------------------------------------%<p>
   
-<p>Welcome to my repo! My name is Michael Glendinning, and here you will find a collection of some of the MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology).<p>
+<p>Welcome to my repo! This page contains a bit MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology).<p>
 
-<p>I got very excited at my most recent job when I discovered that our microscopes had the ability to acquire whole-slide images. Generally speaking, its quite easy to lose sight of the forest between the proverbial trees when looking under a microscope, particularly at high magnification. Sometimes, it is also hard to avoid unknowningly introducing bias. I found it to be a substantial improvement in my workflow to capture the whole slide image of my experiments and then use software to randomly sample them to extract regions of interest (ROIs), removing the opportunity for my biases to influencing my choice of ROIs, and reducing the chance that I miss something interesting on the mesoscopic scale. But, I had to adapt some code and write some new code to handle such large images, out of which this respository was born. <p>
+<p>These tools are all made with the intention of using whole-slide images (WSI) as input. WSI is amaing and is the impetus for a revolution in pathology. That being said, theres no reason why non-WSI images would inherently not work. Given that the main limitation in WSI workflows is nearly alwas the massive file size of gigapixel images, smaller, "regular" sized images may actually see lightning speeds. However, it might be problematic with tiny images until some dimensions of other objects/size thresholds adjusted accordinly. I alsotake advantage of some aspects of WSI histology common attributes to facilitate various tasks, such as the sample generally containing one or a few blobs at most, and each blob generally sporting a white background that extends uninterrupted around its entirety. Without that, some functionality may be lost.<p>
   
-<p>By virtue of my recent unemployment, I've finally been able to devote some time to organizing and cleaning some of the plentitudes of code I've accumulated that leverage MATLAB to both impel and propel my neuroscience research.My inital commit includes two tools. These were initially part of one longer workflow, the rest of which I'll upload in due time. But for now, please enjoy! <p>
-
-<p> Note, this is a living repository, and so I cannot promise that everything works flawlessly (particularly if your images are substantially different from what I have been using for testing), nor can I promise that the code won't be rewritten if you return back here at some later date! But, I've done what I can to make these scripts maximally robust and adaptable. Feel free to reach out to me or submit a pr in the event something does not make sense, bugs are encountered, or there is room for improvement. <p>
+<p> Note, this is a living repository, and so I cannot promise that everything works flawlessly (particularly if your images are substantially different from what I have been using for testing), nor can I promise that the code won't be rewritten if you return back here at some later date! But, I've done what I can to make these scripts maximally robust and adaptable. Feel free to reach out to me un the event something does not make sense, bugs are encountered, or there is room for improvement. <p>
 
 </details>
 
@@ -34,4 +32,10 @@ The first, and more thoroughly tested/annotated, is a library of tools for the s
 - **part 3** calls Thirion's demon algorithm, as implemented in the image processing toolbox built in to MATLAB. Because of the multi-resolution approach of this implementation, this step usually takes at most 2-3 minutes. <p>
 </details>
 
+<details id=3>
+<summary><h2> Randomized ROI subsampling (semi-automated) </h2></summary>
   
+<p>This script allows one to derive from a much larger WSI scene a certain number of rectangular subregions that can be the basis for downstream analyses. **USE WITH CAUTION** Although tempting, this should NOT be used as a means of artifically increasing statistical power (although its done all the time). Each of the ROIs generated from the same image must be treated as very much NOT independent of one another; hierarchical regression models are often useful. Subsampling ROIs from the whole slide image allows for more precise and controlled analysis of specific regions of interest. This can help reduce variability and bias that may arise from analyzing the entire tissue section. This is particularly true when your samples are of very different size.<p>
+
+  
+  </details>

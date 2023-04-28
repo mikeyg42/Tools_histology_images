@@ -4,8 +4,7 @@
 <p>Welcome to my repo! This page contains a bit MATLAB code I've written over the course of the past few years to assist me in various image processing tasks encountered as a research scientist studying molecular biology (the past 6 years of my career has been devoted to understanding the neurovasculature, both in development and pathology).<p>
 
 <p>These tools are all made with the intention of using whole-slide images (WSI) as input. WSI is amaing and is the impetus for a revolution in pathology. That being said, theres no reason why non-WSI images would inherently not work. Given that the main limitation in WSI workflows is nearly alwas the massive file size of gigapixel images, smaller, "regular" sized images may actually see lightning speeds. However, it might be problematic with tiny images until some dimensions of other objects/size thresholds adjusted accordinly. I alsotake advantage of some aspects of WSI histology common attributes to facilitate various tasks, such as the sample generally containing one or a few blobs at most, and each blob generally sporting a white background that extends uninterrupted around its entirety. Without that, some functionality may be lost.<p>
-  
-<p> Note, this is a living repository, and so I cannot promise that everything works flawlessly (particularly if your images are substantially different from what I have been using for testing), nor can I promise that the code won't be rewritten if you return back here at some later date! But, I've done what I can to make these scripts maximally robust and adaptable. Feel free to reach out to me un the event something does not make sense, bugs are encountered, or there is room for improvement. <p>
+
 
 </details>
 
@@ -14,10 +13,10 @@
  
 The first, and more thoroughly tested/annotated, is a library of tools for the semi-automated foreground/background segmentation of large, brightfield whole-slide images. As long as your images hold the following attributes, this tool should be well-suited to your workflow:
 - your images are in RGB format. MATLAB has a nice library of color space conversion functions if youre images are described in another color space. If you have only grayscale images though, you will need to rewrite some code or devise a creative work-around.
-- you images must have a light-colored background with a homogenous texture.
-- your images must have foregrounds of darker-colored blobs, which are surrounded on all sides by background (originally I wrote this with the assumption of the foreground being one contiguous blob, but recently have been trying to expand this range to include multiple blobs.... still a work in progress though. If need be, one can always segment 1 blob at a time, and after  segmenting one, inpaint over it before moving onward to the next.)
-- the images are fairly big and high-resolution (my tiff files that I've been testing with range from 0.5 to 10 gigabytes in size). I've tested as small as 400x400x3 images and had no issue. Smaller than that can lead to some issues. Larger than that will work, but it may go slow.... And, if your images are super blurry or low-resolution, not only will my code not work, but your downstream applications will also likely not work -- image processing should NEVER be used to compensate for crap images; the answer to bad images is not good code, it is better images. 
- <p>First and foremost this repository is an exploratory tool. This is because instead of having just 1 segmentation strategy, I've included a menu of 8 different segmentation algorithms you can try out. It also includes 6 different "refinement" algorithms to improve a segmentation. Because consistency and reproducibility are super important in science, and are inherently at odds with this kind of "a la carte" approach, the suggested usage of this tool is to first determine what approach is best-suited to your data. After you've determined that, every image should be segmented the same way. <p>
+- your images should have foregrounds of darker-colored blobs surrounded on all sides by background 
+- the images are fairly big and high-resolution (my tiff files that I've been testing with range from 0.5 to 10 gigabytes in size). 
+
+<p>First and foremost this repository is an exploratory tool. This is because instead of having just 1 segmentation strategy, I've included a menu of 8 different segmentation algorithms you can try out. It also includes 6 different "refinement" algorithms to improve a segmentation. Because consistency and reproducibility are super important in science, and are inherently at odds with this kind of "a la carte" approach, the suggested usage of this tool is to first determine what approach is best-suited to your data. After you've determined that, every image should be segmented the same way. <p>
 </details>
 
 <details id=2>

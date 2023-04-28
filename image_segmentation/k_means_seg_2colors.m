@@ -45,13 +45,13 @@ numColors = 2;
 
 LABELED = imsegkmeans(chls,numColors, 'Threshold', 1e-3); %the core of this function is the built in imsegkmeans
 
-labelVals = [1, 2];
-zerocolor = mean(LABELED(2:5,2:5), 'all');
+labelVals = unique(LABELED); %these will be the two colors of the labeled image, I think always its =1 or 2
+zerocolor = round(mean(LABELED(2:10,2:5), 'all')); %its random if the foreground or background is set to 1 or 2...
 maskColor = labelVals(labelVals~=zerocolor);
 
 LABELED(LABELED==maskColor) = 5;
 LABELED(LABELED==zerocolor) = 0;
-maskBW = double(LABELED)./5;
+maskBW = im2double(LABELED)./5;
 
 se = strel('disk', 7, 8);
 

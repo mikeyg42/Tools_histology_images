@@ -3,7 +3,7 @@ function binaryMask = finalizeMASK(binaryMask,imAdjRGB)
 % outlining a particular image (imAdjRGB). Will show overlay of mask on image
 % and a GUI with various options to refine the mask, or redraw it entirely. 
 % Select DONE to exit
-
+%Michael Glendinning, 2023
 close all force
 
 
@@ -16,6 +16,7 @@ listMethods = {'DONE',...
     'Segment w/ Morphology',...
     'k means color clustering segmentation',...
     'Texture segmentation options GUI (no Gabor)',...
+    '(needs work still) Texture segmentation Gabor+LBP, then FCM',...
     'thresholding / imclose, refined as polyshape',...
     'refine : dilate mask',...
     'refine : just active contour (ie snakes)',...
@@ -130,9 +131,8 @@ switch choice
         imgMedian = mikeMedianFilter(imgCurrent, 2, 750, 'RGB');
         current_blurred = imfilter(imgMedian, H);
         imageB = imcomplement(current_blurred);
-        grayIm = rgb2gray(imageB); 
         
-        outOfBoundsMask = hysteresisThreshold_wMorph(grayIm, imageB);
+        outOfBoundsMask = hysteresisThreshold_wMorph(imageB);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
         
@@ -170,6 +170,10 @@ switch choice
         outOfBoundsMask = k_means_seg_2colors(imgCurrent,true);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
+    case '(needs work still) Texture segmentation Gabor+LBP, then FCM'
+        gray_img = rgb2gray(imgCurrent);
+        outOfBoundsMask = textureSeg_FCM(gray_img);
+        
     case 'refine : morphology; opening-recon. and closing-recon'
         se3 = strel('disk',21);
         Ierode = imerode(outOfBoundsMask,se3);
@@ -180,7 +184,7 @@ switch choice
         Iopenbyrecon_closingbyrecon = imcomplement(Iopenbyrecon_closingbyrecon);
         outOfBoundsMask = imregionalmax(Iopenbyrecon_closingbyrecon);
         
-        outOfBoundsMask= bwareafilt(outOfBoundsMask, 5);
+        %??? include?! hmmmm
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'refine : adjust the vertices of the largest blob'

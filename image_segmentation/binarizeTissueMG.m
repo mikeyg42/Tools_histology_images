@@ -1,5 +1,5 @@
 function BinMask = binarizeTissueMG(RGBim, varargin)
-%BinMask = binarizeTissueMG(RGBim) OR BinMask = binarizeTissueMG(RGBim, bufferAMount)
+%BinMask = binarizeTissueMG(RGBim) OR BinMask = binarizeTissueMG(RGBim, bufferAmount)
 % this function will quickly binarize an RGB image. This is accomplished by extracting the
 % luminosity from the image, flattening and blurring it with edge-preserving functions,
 % followed by a generous thresholding. After this, we select just the largest blob,
@@ -42,8 +42,8 @@ newROImask = roicolor(Idiffusion, (Tlevel/1.5), 1);
 % select the largest blob
 BW = bwareafilt(logical(newROImask), 1);
 
-%define the bloob boundaries using contour
-ct = contourc(BW, [0.5, 0.5]);
+%define the blob boundaries using contour
+ct = contourc(im2double(BW), [0.5, 0.5]);
 conX = ct(1,2:end);
 conY = ct(2,2:end);
 
@@ -54,9 +54,10 @@ ps = polyshape(conX, conY, 'Simplify', true);
 % then, remake your mask
 ps2 = polybuffer(ps.Vertices, 'points', bufferAmount);
 bufferedMask = poly2mask(ps2.Vertices(:, 1), ps2.Vertices(:, 2), size(RGBim, 1), size(RGBim, 2));
+[gx, gy] = derivative5(lscaled, 'x', 'y');
+target = imcomplement(hypot(gx, gy));
 
-target = imcomplement(imgradient(lscaled));
-%remove your padding of edges with 30 iterations of active contour
+%remove your padding of edges with 30 or so iterations of active contour
 BinMask = activecontour(target, bufferedMask, 32);
 end
 

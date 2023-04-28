@@ -1,18 +1,18 @@
 function newVertices = fillInPolyLine(original_polyline, MIN_distBewtweenPoints, MAX_distBetweenPoints)
-% returns a new vector of points defining a line in which all points are within a certain
+% newVertices = fillInPolyLine(original_polyline, MIN_distBewtweenPoints, MAX_distBetweenPoints) 
+% This returns a new vector of points defining a line in which all points are within a certain
 % specified distance of each other, defined as MAX_distBetweenPoints. 
 % All edges longer than MAX_distBetweenPoints threshold are split up.
 
-% original_polyline can be either a polyline ROI, or it can be a matrix of
+% Original_polyline can be either a polyline ROI, or it can be a matrix of
 % vertices
 
-% if no minimum is desire, just put 0.
-% if no maximum is desired, just put Inf
+% If no minimum is desire, just put 0. if no maximum is desired, just put Inf
 
-% if you want to later create a new ROI using new points, call: 
+% If user wants to later create a new ROI using points here generated, call: 
 %      newPolyLine = drawpolyline('Position',newVertices);
 
-% -Michael Glendinning
+% -Michael Glendinning, 2022
 
 try MyVertices = original_polyline.Position; % verticies in the form [x, y]
     
@@ -33,15 +33,24 @@ format longG
 
 % I should change this to calculate the determinant of this matrix 
 %[x1, y1, 1; x2,y2,1;x3,y3,1] which is 0 if colinear
+
 numPoints = size(MyVertices,1);
+% duplicate points briefly
+MyVertices = [MyVertices(end-1:end,:); MyVertices; MyVertices(1:2,:)];
+
 connectionMatrix = zeros(numPoints,1);
+tolerance = 1e-6;
 
     for ii=2:numPoints
         v1 = MyVertices(ii-1,:);
         v2 = MyVertices(ii,:);
+        v3 = MyVertices(ii+1,:);
         
-        if any((v2-v1)==0)
-        connectionMatrix(ii, 1) = connectionMatrix(ii-1, 1)+1;
+    slope1 = (v2(2)-v1(2)) / (v2(1)-v1(1));
+    slope2 = (v3(2)-v2(2)) / (v3(1)-v2(1));
+        
+        if abs(slope1-slope2) < tolerance
+           connectionMatrix(ii, 1) = connectionMatrix(ii-1, 1)+1;
         else
            connectionMatrix(ii-1, 1) = 0 ;
        end
@@ -49,6 +58,9 @@ connectionMatrix = zeros(numPoints,1);
 
 MyVertices = MyVertices.*(connectionMatrix==0);
 MyVertices(all(~MyVertices,2), : ) = [];
+
+% Remove duplicated points
+MyVertices = MyVertices(3:end-2,:);
 
 %% loop two address the minimum distance between points constraint #########
 if MIN_distBewtweenPoints > 0
@@ -123,7 +135,7 @@ numberNewPointsADDED(ii,1) = floor(dist/MAX_distBetweenPoints);
 totalNewPoints = totalNewPoints+numberNewPointsADDED(ii,1);
 end
 
-%% PSYCH! loop #4... assigns the points chunk by chunk into output format ##########
+%% loop #4... assigns the points chunk by chunk into output format ##########
 
 %preallocate new vertex matrix
 totalPoints = totalNewPoints + numPoints;

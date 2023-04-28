@@ -56,8 +56,8 @@ if strcmpi(descriptor, 'Gray')
     filtered2Dgray = 1 - fastTophat(inverted2Dim_unfilt,se);
     RGBadj = rescale(filtered2Dgray, min(RGB(:)), max(RGB(:)));
      %... we rescale back to original contrast here ^^.
-    return;
-end
+ 
+else
 
 
 if strcmpi(descriptor, 'RGB_stacked')
@@ -96,6 +96,7 @@ if flag == 0
 RGBadj = RGBadj_pad(4:small_sz(1)-3, 4:small_sz(2)-3, 1:3);
 else
     RGBadj = RGBadj_pad;
+end
 end
 end
 

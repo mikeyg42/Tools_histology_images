@@ -1,330 +1,234 @@
-function varargout = imSegmentation_mosaics(varargin)
+function imSegmentation_mosaics
 % Syntax OPT 1: loopingSegmentation_mosaics (... no inut/output, instead modify the first few lines of this .m file)
 % Syntax OPT 2: {mask1, mask2,..., maskn} = loopingSegmentation_mosaics {path1, path2,...pathn};
-% This function is the parent function for all of the foreground/background 
+% This function is the parent function for all of the foreground/background
 % image segmentation code I've written for whole-slide image (WSI) mosaics.
 
-% There are a few ways that it runs: 
+% WAIT! STOP! Before you proceed, open up the "setts_and_prefs.m and set all of your settings and preferences!!
+% Every customizable feature of the code should be found there so there is unlikely any need to modify the code files
 
-% Opt 1. Standard use case is NO input and NO output variables.
-% Instead, in the first chunk of the code in this .m file contains some file 
-% paths that should be replaced to reflect your local storage. These will
-% be your inputs and outputs effectively.
-%      - Importantly, image filenames are assumed to contain substantial information
-%          as to that image's etiology. It must be easily parsed and easily
-%          locatable in the filesystem
-%      - note: Its is a Terrrible idea to ever run code on your only copy of a dataset... 
-%          Do yourself a favor, back it up, and then work on a copy.
+% This code makes two assumptions, for which there are potentially work arounds but they
+% are not idea. First, it is assumed that the "whole" in whole slide imaging was observed...
+% This means that the ENTIRE foreground is contained within the image - ie, there
+% should be a large blob in the middle of a white background,and minimal/zero edge
+% intersections of theforeground and the image outer extent boundaru. I've tried to keep flexibile
+% so that a lot of the code will work with this assumption not met. But its far from ideal.
+% Some aspects of the code will also assume each WSI has 1 blob... I continue to work on
+% handling case of 2+ blobs.
 
-% Opt 2. Atypical use case. INPUT is a cell array of file paths. OUTPUT will be a
-% cell array of the same length as INPUT, except each cell will have a binary image files. 
-% everything will still be saved as indicated. Only binary image masks will
-% output.
+% Second assumption is that this is brightfield, not fluorescent microscopy.Inverted
+% images with high tissue autofluroescence might work in some instances, but I've had little
+% success in my tests. A different set of tools is advisable for such images.
 
-% BACKGROUND -  This code was made to address new challenges associated with 
-% my ever-increasing propensity of whole slide images for any chromogenic
-% histology staining experiment. After ISH or IHC, I would image my tissue using 
-% our brightfield scope (an Zeiss AxioImager), equipped w/ a 10X objective
-% and automated stage, and Zeiss's proprietary software Zen Black 2012. I
-% also used Zen for stitching of my images. 
-
-% The functions I've included here SHOULD work just as well for HE, LFB,
-% Nissl, (anything brightfield). Howver, the CRITICAL assumption is that
-% the ENTIRE foreground is contained within the image! By this I mean that there 
-% should be a large blob in the middle of a white sea, with minimal edge
-% intersections. I've tried to build in some flexibility so that if a blob
-% touches the edge once or twice some things work. But the majority of
-% edges must be clear for this to work. Some aspects of the code will also assume
-% each WSI has 1 blob, but it is an ongoing effort to handle 2+ blobs. 
-
-% Note: This code as is will NOT segment WSI images of fluroescent microscopy.
-
-% Note: The script, as is, relies heavily upon your file naming convention.
-%  Prepending my convention with your own is easy and will ensure you have no
-%  issues. It requires three, underscore-seperated identifiers: 
+% Note: The script, as is, relies heavily upon the file naming convention.
+%  Prepending my convention to your own is easy and will ensure you have no
+%  issues. It requires three, underscore-seperated identifiers:
 
 %               {1} _ {2} _ {3} _ {optional 4}.tiff
-%        ie. "GROUPid_SAMPLEid_STAINid_ExtraInfo.tiff   
+%        ie. "GROUPid_SAMPLEid_STAINid_ExtraInfo.tiff
 
-% {1} - experimental group ID. I often use: "SICK" or "HEALTHY". 
-%       
+% {1} - experimental group ID. I often use: "SICK" or "HEALTHY".
 % {2} - SAMPLE id. I often use A, B, C, ...
-
 % {3} - identification of the particular staining performed in that image
 %       (H+E, ect.) For IHC usually the particular target antigen for
 %       IHC-Dab (e.g. CD31, Sox17, ...)
-
 % {4} - whatever other notes/identifiers you want, it should not mess up
 %       anything (...except potentially you shouldn't include more underscores
 %       or repeat one of the identifiers from {1}, {2}, or {3}?)
 
-% After the input is parsed, images are preprocessed. Raw image mosaics
+% After the input and settings are parsed, images are preprocessed. Raw image mosaics
 % always exhibit a hallmark, frustrating grid-pattern (I'll refer to as
 % the "picnic tablecloth effect"). The best way to prevent this is careful
 % setting up of Kohler illumination and optimizing of image acquisition settings.
-% But, after acquisition, your solution depends on how your downstream 
-% analyses's sensitivity. Here I've addressed the picnic table effect with a 
-% background correction algorithm (using the tophat filter). If this is 
-% insufficient, you can modify preprocessingRawRGBims.m and backgroundCorrectRGB.m 
-% And for more serious problems, check out the open source dockerized 
-% workflow called MCMICRO, which uses the program BaSiC, (also an ImageJ plugin). 
+% But, after acquisition, your solution depends on how your downstream
+% analyses's sensitivity. Here I've addressed the picnic table effect with a
+% background correction algorithm (using the tophat filter). If this is
+% insufficient, you can modify preprocessingRawRGBims.m and backgroundCorrectRGB.m
+% And for more serious problems, check out the open source dockerized
+% workflow called MCMICRO, which uses the program BaSiC, (also an ImageJ plugin).
 
 % Michael Glendinning, 2023
 
 close force all
-clear all
+%clear all
 
-%% set your parameters
+[mySettings] = setts_and_prefs;
 
-    % 1. Set your scale factor. The closer to 1 the better! If you
-    % experience crashing or painfully slow processing, raise this.
-scaleFactor = 2.8; 
-resizeBig = false; %(this indicates you'd like to resize it to be fullsized upon save.) 
-    
-    % 2. Define the file formats in which raw images will use the following
-    % extensions:1.4 or
-rawdata_format = {'.tiff','.tif'};
+data = parseDataset(mySettings, 'segmentation'); % inside data will be a image datastore from which you can read in images
+%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%
 
-    % 3. delete raw data files after processing and saving? 
-    % NOTE: AFTER PROCESSING, ALL RAW DATA IN directoryImages WILL BE DESTROYED, iff deleteYES equals 1 **
-deleteYES = true;
-    
-    % 4. set these directory locations for your local data storage
-    % NOTE: you MUST include the file seperator "/" at the end of each path...
-directoryImages = '/Users/jglendin/Desktop/LesionVibes/PLP/';
-directorytoSaveInto = '/Users/jglendin/Dropbox - Michael/Dropbox/processedMSimages/';
-   
-    % 5. (optiona;) Include additional text to append to each save file (
-versionNum = '_v1';
-    
-    % 6. start from somewhere in your directory of images other than the first file
-counter = 1;
-
-% each file in our image datastore gets a number. Set counter to be = to the 
+counter = 7;
+% each file in our image datastore gets a number. Set counter to be = to the
 % # you want to start on. After a full loop, counter is reset to counter+1.
 %   Images in the datastore are in the same order as they will be in
-%   the field "filenames" of the structural array "handy"... 
+%   the field "filenames" of the structural array "mySettings"...
 
-
-%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%
-%%  Don't change anything else down here
-%   |       |       |       |       |
-%   V       V       V       V       V
-
-%%  1. Load images and log some information about them
-if nargin ~= 0 && nargout ~= 0
-    if nargin ~= nargout
-        disp('# of inputs must equal # of outputs! try again..');
-        return
-    end
-    % create a datastore for all the images listed in input
-    imageDS = imageDatastore(varargin);
-    outputFlag = 1;
-else 
-    % OR create a datastore for all images found within image directory above
-    imageDS = imageDatastore(directoryImages, 'FileExtensions', rawdata_format);
-    outputFlag = 0;
-end
-
-% get the sample from the full filenames and load into a cell array - (called "imageNames")
-fullFileNames = vertcat(imageDS.Files);
-[~, imageNames, ~] = cellfun(@fileparts, fullFileNames, 'UniformOutput', false);
-
-%% 2. Create a handy structure called "handy" 
-% contains exp parameters, directory paths, tracks your progress, ect.
-
-my_dirs = struct('loadDir', directoryImages, 'saveDir', directorytoSaveInto);
-
-handy = struct('counter', counter, 'versionNum', versionNum,...
-    'scaleFactor', scaleFactor, 'images', imageDS, 'OutputFlag', outputFlag,...
-    'deleteYES', deleteYES, 'directories', my_dirs);
-
-handy.filenames = imageNames;
-
-USETHISscaleFactor = 1/scaleFactor; 
-
-savedfileList  = struct2cell(dir(handy.directories.saveDir))';
-savedfileList = savedfileList(:,1); % isolate the "filename" column
-allfiles_w_tiff = savedfileList(contains(savedfileList, 'tiff'));
-alllfiles_w_png = savedfileList(contains(savedfileList, 'png')); % will be foreground/background segementation masks only
-allSavedFiles = savedfileList(contains(savedfileList, versionNum )); % this gets rid of the hidden files named ".." and such
-
-%--%--%--%--%--% Done w/ prep! --%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%
+scaleFactor = mySettings.seg.seg_scaleFactor;
+USETHIS_scaleFactor = 1/scaleFactor;
 
 %%  3. load up 1st image and start processing
 
-nImages = numel(imageNames);
+nImages = numel(data.imageNames);
 
-while counter<nImages % loop to go through your entire image datastore
-activeFilename = handy.filenames{handy.counter};
-% handy.filenames{handy.counter} will always tell you which file is active. 
-
-% print the date and time into command window so you can track efficiency
-printStartTime_imProcessing(activeFilename);
-
-% I can leverage an image's fileformat to inform me of what it is I've
-% saved... RGB/grayscale images -> ".tiffs",  binary segmentation --> ".png"
-
-% recall the format: "ExpGROUPid_SAMPLEid_STAINid_anyExtraInfo.tiff" e.g. "MS_317_TMEM119_stitched19.tiff"
-namePieces = split(activeFilename, '_');
-groupID =  namePieces{1};
-sampleID = namePieces{2};
-stainID = namePieces{3};
-
-% Now we look within the dir "allSavedFiles" for filenames sharing these ID's:
-matchingIDandStain = contains(allSavedFiles, sampleID, 'IgnoreCase',true) .* contains(allSavedFiles, stainID, 'IgnoreCase',true);
-
-% How we then proceed depends on how many matches we find...
-numberMatches = sum(matchingIDandStain);
-
-switch num2str(numberMatches)
+while counter<=nImages % loop to go through your entire image datastore
+    activeFilename = strip(data.imageNames{counter}, 'both', '/'); % the strip command will remove leading/trailing slashes
     
-    % ...if we have zero matches, we start from beginning of processing workflow
-    case '0'
+    % print the date and time into command window so you can track efficiency
+    printStartTime_imProcessing(activeFilename);
+    
+    % retrieve from data structural array generated by the parsing function what needs doing
+    tf_adjIm = data.segInfo(counter).needAdjRGB ;
+    tf_mask = data.segInfo(counter).needMask ;
+    
+    %use imfinfo to determine the size of the raw and processed images
+    info = imfinfo(data.imageDS.Files{counter});
+    sz = [info.Height; info.Width].*USETHIS_scaleFactor;
+    %-------------------------------------------------------------------------%
+    if tf_adjIm && tf_mask
         % read in the raw image...
-        [imgCurrentlyBig, ~] = readimage(handy.images, handy.counter); % handy.images is my raw image datastore!!!
+        [imgCurrentlyBig, ~] = readimage(data.imageDS, counter);
         
-        % preprocess RGB image: 1. apply the downsampling scaleFactor, 2. convert image to
-        % float (double), 3. background/flatfield correction
-        tic; imAdjRGB = preprocessRawRGBims(imgCurrentlyBig, USETHISscaleFactor);toc;
+        % preprocess RGB image:
+        %1. convert precision to float (double)
+        %2. apply the downsampling scaleFactor,
+        %3. background/flatfield correction w/tophat
+        imAdjRGB = preprocessRawRGBims(imgCurrentlyBig, USETHIS_scaleFactor);
         
         % call the segmentation GUI function for foreground/background segmenting
-        finalbinaryMask = segmentationWrapper(handy, imAdjRGB);
+        finalbinaryMask = segmentationWrapper(imAdjRGB);
+    end
+    %-------------------------------------------------------------------------%
+    
+    if ~tf_adjIm && tf_mask
+        save_fileList_adjRGB = string({dir(fullfile(mySettings.directories.saveSegm_adjImages, '*')).name});
+        fileComponents = split(activeFilename, {'/', '_', '.'});
+        idx_rgb = contains(save_fileList_adjRGB, 'RGB') & contains(save_fileList_adjRGB, fileComponents{2}) & contains(save_fileList_adjRGB, fileComponents{3});
+        % the above expression selects all files with RGB in the filename (which all will
+        % have been saved with, as well as the 3rd and 2nd comoponents of the filename,
+        % which cooresponds to their descriptions in the inital description of function.
+        % {1} is group ID, {2} is sample ID, and {3} is stain ID
         
-        %-------------------------------------------------------------------------%
-        %-------------------------------------------------------------------------%
+        my1savedfile = save_fileList_adjRGB(find(idx_rgb));
+        assert(sum(idx_rgb)==1);
         
-        % ..if we have ONE match in save directory, we can skip ONE step!
-        %   (but which step?...depends on if our match is the RGB or binary file)
-    case '1'
+        % tiff files = RGB, so read in the RGB image match from saveDir
+        imAdjRGB = imread(strcat(mySettings.directories.saveSegm_adjImages, my1savedfile));
+        imAdjRGB = imresize(imAdjRGB, [sz(1), sz(2), 3], {@oscResampling, 4});
         
-        my1savedfile = allSavedFiles(find(matchingIDandStain));
+        % call the segmentation GUI function for foreground/background segmenting
+        finalbinaryMask = segmentationWrapper(imAdjRGB);
+    end
+    %-------------------------------------------------------------------------%
+    if tf_adjIm && ~tf_mask
+        save_fileList_mask = string({dir(fullfile(mySettings.directories.saveSegm_foregroundMask, '*')).name});
+        fileComponents = split(activeFilename, {'/', '_', '.'});
+        idx_mask = contains(save_fileList_mask, 'mask') & contains(save_fileList_mask, fileComponents{3}) & contains(save_fileList_mask, fileComponents{4});
+        my1savedfile = save_fileList_mask(find(idx_mask));
         
-        % OPTION 1- we only have saved a TIFF file
-        if sum(contains(allfiles_w_tiff,my1savedfile))==1
+        assert(sum(idx_mask)==1);
+        
+        try binaryMask = imread(strcat(mySettings.directories.saveSegm_foregroundMask, my1savedfile), 'BackgroundColor', 0);
+        catch
+            binaryMask = imread(strcat(mySettings.directories.saveSegm_foregroundMask, my1savedfile));
+        end
+        binaryMask = imresize(binaryMask, [sz(1), sz(2)], {@oscResampling, 4});
+        binaryMask = logical(binaryMask);
+        
+        % read into workspace the raw image file, then the preprocessing fcn to generate
+        % the adjusted RGBim. then we can proceed to segmentation function
+        [imgCurrentlyBig, ~] = readimage(data.imageDS, counter);
+        imAdjRGB = preprocessRawRGBims(imgCurrentlyBig, USETHIS_scaleFactor);
+        
+        if mySettings.seg.seg_doubleCheckSavedMasks
+            finalbinaryMask = segmentationWrapper(imAdjRGB, binaryMask);
+        else
+            finalbinaryMask = binaryMask;
+        end
+    end
+    %-------------------------------------------------------------------------%
+    if ~tf_adjIm && ~tf_mask
+        if ~mySettings.seg.seg_doubleCheckSavedMasks
+            counter = counter+1;
+            continue
+        else
             
-            % use imfinfo function to ascertain raw image's dimensions 
-            info = imfinfo(strcat(handy.directories.saveDir, my1savedfile));
-            targetCols = info.Width*USETHISscaleFactor;
-            targetRows = info.Height*USETHISscaleFactor;
+            fileComponents = split(activeFilename, {'/', '_', '.'});
             
-            % tiff files = RGB, so read in the RGB image match from saveDir
-            imAdjRGB = imread(strcat(handy.directories.saveDir, my1savedfile));
-            imAdjRGB = imresize(imAdjRGB, [targetRows, targetCols, 3], {@oscResampling, 4});
+            save_fileList_mask = string({dir(fullfile(mySettings.directories.saveSegm_foregroundMask, '*')).name});
             
-            % call the segmentation GUI function for foreground/background segmenting
-            finalbinaryMask = segmentationWrapper(handy, imAdjRGB);
+            % you'll need the binary mask image either way, so get it:
+            idx_mask = contains(save_fileList_mask, 'mask') & contains(save_fileList_adjRGB, fileComponents{3}) & contains(save_fileList_adjRGB, fileComponents{4});
+            mysavedMask = save_fileList_mask(find(idx_mask));
             
-            % OPTION 2 = we have saved a PNG file
-        elseif sum(contains(alllfiles_w_png,my1savedfile))==1
-            info2 = imfinfo(strcat(handy.directories.loadDir, directoryImages));
-
-            sz = [info2.Height; info2.Width].*USETHISscalefactor;
+            try binaryMask = imread(strcat(mySettings.directories.saveSegm_foregroundMask, mysavedMask), 'BackgroundColor', 0);
+            catch
+                binaryMask = imread(strcat(mySettings.directories.saveSegm_foregroundMask, mysavedMask));
+            end
             
-            % png files = binary masks of foreground/background segmentation
-            binaryMask = imread(strcat(handy.directories.saveDir, my1savedfile), 'png', 'BackgroundColor', 0);
             binaryMask = imresize(binaryMask, [sz(1), sz(2)], {@oscResampling, 4});
             binaryMask = logical(binaryMask);
             
-            % read into workspace the raw image file, then the preprocessing
-            % fcn to generate the adjusted RGBim. then we can proceed to
-            % segmentation function
-            [imgCurrentlyBig, ~] = readimage(handy.images, handy.counter);
-            tic; imAdjRGB = preprocessRawRGBims(imgCurrentlyBig, USETHISscaleFactor); toc;
-            finalbinaryMask = segmentationWrapper(handy, imAdjRGB, binaryMask);
+            %get the RGB image as well
+            save_fileList_adjRGB = string({dir(fullfile(mySettings.directories.saveSegm_adjImages, '*')).name});
             
-            % OPTION 3 (unlikely) = we have some non-png, non-tiff fileformats in saveDIr
-        else %ie you have one match in the directory, but its neither a tiff or a png.
-            disp('you have errant fileformats in saveDir. Get rid of anything not PNG and TIFF with near identical names...');
-            return;
+            idx_rgb = contains(save_fileList_adjRGB, 'RGB') & contains(save_fileList_adjRGB, fileComponents{3}) & contains(save_fileList_adjRGB, fileComponents{4});
+            mysavedImg = save_fileList_mask(find(idx_rgb));
+            
+            imAdjRGB = imread(strcat(mySettings.directories.saveSegm_adjImages, mysavedImg));
+            
+            finalbinaryMask = segmentationWrapper(imAdjRGB, binaryMask);
+        end
+    end
+    
+    %-|---%---|---%---|---%---|--%---|---%---|---%---|---%---|---%---|---%---|---%---|
+    
+    %% 4. Saving!!
+    
+    % CAUTION: this will overwrite whatever might have been there before!!
+    % CAUTION: if you rescale back up, for particularly large images MATLAB may fail to save file and become overwhelmed!!!
+    
+    mask_FMT = mySettings.fileFormats.segm_saveFMT_adjImage;
+    RGB_FMT = mySettings.fileFormats.segm_saveFMT_foregroundMask;
+    
+    if mySettings.seg.seg_resizeBig
+        finalSize = [info.Height, info.Width];
+        finalbinaryMask = imresize(finalbinaryMask, finalSize, {@oscResampling, 4});
+        imAdjRGB = imresize(imAdjRGB, finalSize, {@oscResampling, 4});
+        
+        try
+            imwrite(finalbinaryMask, fullfile(mySettings.directories.segm_saveFMT_foregroundMask,strcat(activeFilename,'scale_1.0_', '_ForegroundSegmented',mySettings.savePrefs.seg_versionID ,mask_FMT)), extractAfter(mask_FMT, '.'),...
+                'Compression','none');
+            imwrite(imAdjRGB, fullfile(mySettings.directories.segm_saveFMT_adjImage, strcat(activeFilename,'scale_1.0_', '_adjustedRGBImage', mySettings.savePrefs.seg_versionID ,RGB_FMT)), extractAfter(RGB_FMT, '.'), ...
+                'Compression','none');
+        catch
+            imwrite(imresize(finalbinaryMask,0.8, {@oscResampling, 4}) , fullfile(mySettings.directories.segm_saveFMT_foregroundMask,strcat(activeFilename,'scale_0.8_', '_ForegroundSegmented',mySettings.savePrefs.seg_versionID , mask_FMT)), extractAfter(mask_FMT, '.'),...
+                'Compression','none');
+            imwrite(imresize(imAdjRGB, 0.8, {@oscResampling, 4}), fullfile(mySettings.directories.segm_saveFMT_adjImage, strcat(activeFilename,'scale_0.8_', '_adjustedRGBImage', mySettings.savePrefs.seg_versionID, RGB_FMT)), extractAfter(RGB_FMT, '.'), ...
+                'Compression','none');
         end
         
-        %-------------------------------------------------------------------------%
-        %-------------------------------------------------------------------------%
+    else
+        imwrite(finalbinaryMask, fullfile(mySettings.directories.segm_saveFMT_foregroundMask,strcat( activeFilename,'scale_', sprintf('%.4g', USETHIS_scaleFactor), '_ForegroundSegmented',mySettings.savePrefs.seg_versionID,mask_FMT)), extractAfter(mask_FMT, '.'),...
+            'Compression','none');
         
-        % 2 matches is the BEST case scenario! 2 matches suggests we have what we need:
-        %     TWO images in our saveDir matching the identifiers in our active file.
-        
-    case '2'
-        
-        my2savedfiles = allSavedFiles(find(matchingIDandStain));
-        
-        % let's quickly double check it is 1x png and 1x tiff, and not 2x png or something....
-        % SANITY CHECK:
-        if sum(contains(alllfiles_w_png,my2savedfiles))~=1 || sum(contains(allfiles_w_tiff,my2savedfiles))~=1
-            %if this is true, then save dir does not actually contain 1 image + 1 mask of your stain of interest
-            disp(strcart('error!: your savedDir contains duplicates that are problematic... fix:', activeFilename))
-            return
-        end
-        % end sanity check
-
-        % read in the already adjusted RGB image
-        tiffFile = strcat(handy.directories.saveDir, my2savedfiles{contains(my2savedfiles, 'tiff')==1});
-        imAdjRGB = imread(tiffFile, 'tiff');
-        
-        % read in binary mask image
-        pngFile = strcat(handy.directories.saveDir, my2savedfiles{contains(my2savedfiles, 'png')==1});
-        binaryMask = imread(pngFile, 'png', 'BackgroundColor', 0);
-        binaryMask = logical(binaryMask);
-        
-        % visualize + finalize foreground/background segmentation mask
-        finalbinaryMask = segmentationWrapper(handy, imAdjRGB, binaryMask);
-        
-    otherwise
-        disp(strcat('error!: >2 files in this dir match the active filename: ', activeFilename));
-        return
-        
-end
-%-|---%---|---%---|---%---|--%---|---%---|---%---|---%---|---%---|---%---|---%---|
-%---|---%---|---%---|---%---|--%---|---%---|---%---|---%---|---%---|---%---|---%---|
-        
-%% 4. Saving!!
-
-% CAUTION: this will overwrite whatever might have been there before!!
-% CAUTION: sometimes MATLAB cannot handle such a huge save file!!!
-if resizeBig
-    sF = 1/USETHISscaleFactor;
-    finalbinaryMask = imresize(finalbinaryMask, sF, {@oscResampling, 4});
-    imAdjRGB = imresize(imAdjRGB, sF, {@oscResampling, 4});
-try    
-imwrite(finalbinaryMask, strcat(handy.directories.saveDir,activeFilename,'scale_1.0_', '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
-    'Compression','none');
-imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'scale_1.0_', '_adjustedRGBImage', handy.versionNum ,'.tiff'), 'tiff', ...
-    'Compression','none');
-catch
-   imwrite(imresize(finalbinaryMask,0.5, {@oscResampling, 4}) , strcat(handy.directories.saveDir,activeFilename,'scale_0.5_', '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
-    'Compression','none');
-imwrite(imresize(imAdjRGB, 0.5, {@oscResampling, 4}), strcat(handy.directories.saveDir, activeFilename,'scale_0.5_', '_adjustedRGBImage', handy.versionNum ,'.tiff'), 'tiff', ...
-    'Compression','none'); 
-end
-else
-  imwrite(finalbinaryMask, strcat(handy.directories.saveDir, activeFilename,'scale_', sprintf('%.4g', USETHISscaleFactor), '_ForegroundSegmented',handy.versionNum ,',.png'), 'png',...
-    'Compression','none');
-
-imwrite(imAdjRGB, strcat(handy.directories.saveDir, activeFilename,'scale_', sprintf('%.4g', USETHISscaleFactor), '_adjustedRGBImage',handy.versionNum,'.tiff'), 'tiff', ...
-    'Compression','none');  
-end
-
-if outputFlag > 0
-    varargout{outputFlag} = finalbinaryMask;
-end  
-
-%/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%
-%--%--\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/
-        
-%% 5. (optional) move file into recycling bin
-recycle on;
-
-if handy.deleteYES
-delete(strcat('/Users/jglendin/Desktop/tiled images as tiffs/', 'activeFilename'));
-end
-
-
-%% DONE! move on to the next image
-
-% update the counter!
-handy.counter = handy.counter+1;
-outputFlag = outputFlag +1;
+        imwrite(imAdjRGB, fullfile(mySettings.directories.segm_saveFMT_adjImage, strcat( activeFilename,'scale_', sprintf('%.4g', USETHIS_scaleFactor), '_adjustedRGBImage',mySettings.savePrefs.seg_versionID, RGB_FMT)), extractAfter(RGB_FMT, '.'), ...
+            'Compression','none');
+    end
+    
+    %/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%
+    %--%--\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/
+    
+    %% 5. (optional) move file into recycling bin
+    recycle on;
+    
+    if mySettings.seg.seg_deleteYES
+        delete(fullfile(mySettings.directories.rawData, activeFilename));
+    end
+    
+    %% 6. Update the counter!
+    counter = counter+1;
+    
+    %% DONE! move on to the next image
 end
 
 end
@@ -334,9 +238,9 @@ end
 
 
 
-function finalMask = segmentationWrapper(handy, imAdjRGB, varargin)
-%% segmentation of the tissue piece from the background. 
-% 
+function finalMask = segmentationWrapper(imAdjRGB, varargin)
+%% segmentation of the tissue piece from the background.
+%
 % Inputs    : 1. pre-processed, high resolution whole slide image
 %             2. (optional) an already-made segmentation mask delineating foreground/background
 %-------------
@@ -346,16 +250,16 @@ function finalMask = segmentationWrapper(handy, imAdjRGB, varargin)
 %-------------
 % Outputs   : 1. segmented binary image (white=foreground)
 
-% Highlights: 
+% Highlights:
 % - a few  of the segmentation techniques are (as far as I can tell)
-% entirely novel methodologies. 
-% - The semi-automated approach is very powerful here, as one is forced to 
-% become very well acquainted with both their data and their code, and 
-% yet, if done well, minimal biases are introduced. 
+% entirely novel methodologies.
+% - The semi-automated approach is very powerful here, as one is forced to
+% become very well acquainted with both their data and their code, and
+% yet, if done well, minimal biases are introduced.
 %  - Some of these segmentation methods are not my own - I credit each
 %  as applicable, although I've modified them all to some extent
 
-% CAVEAT, for downstream applications involving high precision 
+% CAVEAT, for downstream applications involving high precision
 % quantification its inappropriate to pick and choose segmentation methods
 % and refinements. Find what works best for your images and stick to that!
 
@@ -363,16 +267,16 @@ function finalMask = segmentationWrapper(handy, imAdjRGB, varargin)
 
 %% in case there is already a draft mask...
 if numel(varargin) > 0 && ismatrix(varargin{1})
-   binaryMask = varargin{1};
-   
+    fin_binaryMask = varargin{1};
+    
 else
-% ... otherwise segment the image initially using morphology
- 
-binaryMask = morphologySegment(imAdjRGB);   
+    % ... otherwise segment the image initially using morphology
+    imAdjRGB_small = imresize(imAdjRGB, 0.9, {@oscResampling, 4});
+    binaryMask_small = textureFilterGUI(imAdjRGB_small);
+    fin_binaryMask =  imresize(binaryMask_small, size(imAdjRGB, 1:2), {@oscResampling, 4});
 end
 
 %% Mask-Refining GUI
-finalMask = finalizeMASK(binaryMask,imAdjRGB);
-
+finalMask = finalizeMASK(fin_binaryMask,imAdjRGB);
 
 end

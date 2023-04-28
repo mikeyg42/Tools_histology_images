@@ -1,4 +1,4 @@
-function outOfBoundsMask = hysteresisThreshold_wMorph(grayImage, RGBimage)
+function outOfBoundsMask = hysteresisThreshold_wMorph(RGBimage)
 % syntax =  outOfBoundsMask = hysteresisThreshold_wMorph(grayImage, RGBimage)
 
 % my implementation of a hysteresis type of thresholding (also known as
@@ -8,8 +8,10 @@ function outOfBoundsMask = hysteresisThreshold_wMorph(grayImage, RGBimage)
 % definitive peaks, which I can then use to index into the wide-net segmentation to 
 % remove extraneous object, which is accomplished with IMFILL.
 
+% Michael Glendinning, 2022
 
 %% step 1: evaluate the histogram and determine otsu's threshold level
+grayImage = rgb2gray(RGBimage);
 GT = graythresh(grayImage); %gives the threshold level (via Otsu's method)
 
 [n,bins] = imhist(RGBimage);
@@ -37,6 +39,8 @@ if sum(sum(imclearborder(imbinarize(grayImage, minVals(b))))) == chk
         GenerousThreshold = minVals(b);
     end
 end
+% skip this if you aren't confused by the concept behind my hsyteresis threshold
+% ......
 % the above asks: "If, at the thresh. level of the histogram min, then
 % there is part of mask touching border, then ok fine whatever - we
 % just move on. BUT, we could get lucky and discover a border touching (i.e. after
@@ -63,5 +67,5 @@ hysteresisImage = hysteresisImage & generousBinary;
 se = strel('disk', 9, 8);
 outOfBoundsMask = imclose(hysteresisImage, se);
 
-figure; imshow(outOfBoundsMask);
+%figure; imshow(outOfBoundsMask);
 

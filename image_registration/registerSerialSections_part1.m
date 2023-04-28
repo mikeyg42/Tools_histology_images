@@ -1,8 +1,14 @@
 function registerSerialSections_part1
-%% identify the image directory and the identities of the imades you'd like to register
+% This script takes as input 2 images along with a binary "masks" (where white indicates
+% foreground and black indicated background) for each, and will attempt to register them
+% semi-automatically using affine transformations. At the end of the script, part 2 is
+% automatically initiated, which further improves the registration with first a local
+% genometric transformation and then a diffeomorphic demons algorithm.
+
+
 % Note: The script, as is, relies heavily upon your file naming convention.
-%  Prepending my convention with your own is easy and will ensure you have no
-%  issues. It requires three, underscore-seperated identifiers: 
+%   Prepending my convention with your will prevent any issues. 
+%   my convention requires three, underscore_seperated identifiers: 
 
 %               {1} _ {2} _ {3} _ {optional 4}.tiff
 %        ie. "GROUPid_SAMPLEid_STAINid_ExtraInfo.tiff   
@@ -15,18 +21,20 @@ function registerSerialSections_part1
 %       (H+E, ect.) For IHC usually the particular target antigen for
 %       IHC-Dab (e.g. CD31, Sox17, ...)
 
-% {4} - whatever other notes/identifiers you want, it should not mess up
-%       anything (...except potentially you shouldn't include more underscores
-%       or repeat one of the identifiers from {1}, {2}, or {3})
-
+% {4} - whatever other notes/identifiers you want. Your naming convention 
+%       can just be here with "{1}_{2}_{3}_" tacked on front, and it will not 
+%       mess up anything. Two exceptions:
+%           - no additional underscores. there must be 3 and only 3 in the filename
+%       	- do not repeat identical text thats in {1}, {2}, or {3}. 
+%      e.g. [DO NOT EMULATE THIS]: '.../control_lumbar02_CD68_mybestCD68ControlSC.tiff'  <- BAD
 
 
 % change these variable assignments! 
 %  ||    ||
 %  vv    vv     directorytosaveinto should be where you have your 
 % ======================================================================================== %
-directorywithimagefiles = '/your/dir/images/';  %
-destinationToSaveInto = '/your/ave/Directory/';%
+directorywithimagefiles = '/Users/jglendin/Desktop/tiled_images_as_tiffs/';  %
+destinationToSaveInto = '/Users/jglendin/Dropbox/Dropbox - Michael/processedMSimages';%
 ID = 'A'; %===========================================================================  % 
 Stain1_fixed = 'CD31'; %=================================================================  %
 Stain2_moving = 'MCAM'; %=================================================================  %
@@ -36,7 +44,8 @@ Stain2_moving = 'MCAM'; %=======================================================
     
 %% Part 0. Preprocessing steps 
 
-%% preprocessing step 1. Load the image files (specified above)
+
+%% preprocessing step 1. Load the image files 
 % We need to load into the workspace the two images we will register. We
 % also need masks delineating background/foreground. 
 imDS = createDatastoreWithAll4Images(directorywithimagefiles, ID, Stain1_fixed, Stain2_moving);
@@ -52,13 +61,17 @@ MOVING_pre = ensureDoubleScaled(myimages{4},true);
 MOVINGmask_pre = logical(myimages{3});
 clear myimages
 
+
 %% preprocessing step 2. optional re-orientation GUI for coarse, manual oriention
 close all force
 pause(1);
+
 % provide a visual on which to base decision of option GUI 
 movingOverlay = imfuse(rgb2gray(MOVING_pre), MOVINGmask_pre, 'falsecolor', 'Scaling', 'none', 'ColorChannels', [2,1,2]);
 fixedOverlay = imfuse(rgb2gray(ref_IMGadj), ref_IMGmask, 'falsecolor', 'Scaling', 'none', 'ColorChannels', [1,2,2]);
-fOverlay = figure('Visible', 'on', 'HitTest', 'off'); axOverlay = axes(fOverlay, 'TitleFontSizeMultiplier', 1.4);
+fOverlay = figure('Visible', 'on', 'HitTest', 'off'); 
+axOverlay = axes(fOverlay, 'TitleFontSizeMultiplier', 1.4);
+drawnow expose 
 axOverlay.Title.String = 'Left = moving, Right = Fixed';
 imshowpair(movingOverlay, fixedOverlay, 'montage', 'Parent', axOverlay);
 
@@ -83,6 +96,8 @@ else
     MOVINGadj = MOVING_pre;
     MOVINGmask = MOVINGmask_pre;
 end
+
+
 %% preprocessing step 3. image enhancing
 % backgrund correction and convert to grayscale WEIGHTS OF GRADIENTS -
 % this is inversly related to gradient, s.t. smooth regions (tiny gradient)=big weights (i.e. white)
@@ -94,10 +109,10 @@ se = strel('disk',25);
 tophatFixed = 1 - imtophat(imcomplement(ref_IMGadj), se);
 tophatMoving = 1 - imtophat(imcomplement(MOVINGadj), se);
 
-% convert images into their weighted gradients :
-% Weighting gradients are generally much FLATTER. The algorithm
-% priorited important original pixels like strong edges are kept
-% unchanged.
+% convert images into their WEIGHTED GRADIENTS :
+% Weighting gradients are generally very FLAT. The algorithm
+% prioritizes important original pixels like strong edges are kept
+% unchanged. (its a 2nd deriv ultimately)
 
 ref_IMGgray = rgb2gray(gradientweight(tophatFixed, 1.8, 'RolloffFactor', 1.25, 'WeightCutoff', 0.01));
 MOVINGgray = rgb2gray(gradientweight(tophatMoving, 1.8, 'RolloffFactor', 1.25, 'WeightCutoff', 0.01));
@@ -124,21 +139,28 @@ if contains(answeringBox, 'Yes')
     ref_IMGmask  = vertexTweaking_handdrawn(ref_IMGmask,ref_IMGgray, 120);
 end
 
-%
+%% step 5. background filter! do this by blurring background lots but not touching foreground using mask
+
+% 0th. temporarily shrink
+% 1st. blurring nonlinear Median Filter. 2nd. blurring with a gaussian filter, and 
+% 3rd. H-minima transform is taken for each channel of the RGB image seperately. 
+% 4th. bring back to the size before 0th step
+% ~~ first the fixed image
 tophatFixed_small = imresize(im2double(tophatFixed), round(size(tophatFixed, 1:2).*0.17), 'bilinear');
 blurry1 = imgaussfilt(mikeMedianFilter(tophatFixed_small, 3, 1250, 'RGB'), 13, 'FilterSize', 25, 'FilterDomain', 'frequency'); 
 blurry1 = cat(3, imhmin(blurry1(:,:,1),0.2), imhmin(blurry1(:,:,2),0.2), imhmin(blurry1(:,:,3),0.2)); %supress minima below 0.2
 blurryFixed = imresize(blurry1, size(tophatFixed, 1:2), 'bilinear');
-
+% ~~ repeat with the moving
 tophatMoving_small = imresize(im2double(tophatMoving), round(size(tophatMoving, 1:2).*0.17), 'bilinear');
 blurry2 = imgaussfilt(mikeMedianFilter(tophatMoving_small, 3, 1250, 'RGB'), 13, 'FilterSize', 25, 'FilterDomain', 'frequency'); 
 blurry2 = cat(3, imhmin(blurry2(:,:,1),0.2), imhmin(blurry2(:,:,2),0.2), imhmin(blurry2(:,:,3),0.2)); %supress minima below 0.2
 blurryMoving = imresize(blurry2, size(tophatMoving, 1:2), 'bilinear');
 
+% ONLY use that super super blurry image on your BACKGROUND! Keep foreground pristine
 ref_IMGgray(~ref_IMGmask) = blurryFixed(~ref_IMGmask);
 MOVINGgray(~MOVINGmask) = blurryMoving(~MOVINGmask);
 
-%% preprocessing step 5: image padding to preserve edges and prevent clipping from rotation
+%% preprocessing step 6: image padding to preserve edges and prevent clipping from rotation
 % also need to provide enough space for clipping that might occur after scaling and rotating!
 
 padAmt = 200; %if substantial rotation will be required (>30deg), or images > 1.5 gigabyte add more pad.
@@ -229,22 +251,27 @@ im4 = myNEWimages{4}; myNEWimages{4} = imcomplement(imclearborder(imcomplement(i
 %figure; montage(myNEWimages);
 
 %% save your work here
-data = struct([]);
-data(1).fixedMat = fixedMat_new;
-data(1).movingMat = movingMat_new;
-data(1).images_part1 = myNEWimages;
-savePath = strcat(destinationToSaveInto, 'registration_data_' , ID,'_', Stain1_fixed,'_' ,Stain2_moving, '.mat');
-save(savePath, '-struct', 'data', '-v7.3', '-nocompression');
+part1 = struct([]);
+part1(1).fixedMat = fixedMat_new;
+part1(1).movingMat = movingMat_new;
+part1(1).images_part1 = myNEWimages;
+save(handy.savePath, '-struct', 'part1', '-v7.3', '-nocompression');
 
 %% proceed to ~part 2~
+% ==%==%==%==% Leave this Script and go to PART 2 =%==%==%==%==%==%===%==%==
+
 [D, tform, m_im, movedMask] = reigsterSerialSections_part2_nonrigid(fixedMat_new,movingMat_new, myNEWimages);
 
-data2 = struct([]);
-data2(1).displacementField = D;
-data2(1).transformation = tform;
-data2(1).movedIm = m_im;
-data2(1).movedMask = movedMask;
-save(savePath, 'data2', '-v7.3', '-nocompression', '-append');
+% %==%==%==%==%= Welcome Back! and Good Job! =%==%==%==%==%==%==%==%==%==%==%=
+%% append this second data structure to the .mat file where you saved part 1 info
+
+part2 = struct([]);
+
+part2(1).displacementField = D;
+part2(1).transformation = tform;
+part2(1).movedIm = m_im;
+part2(1).movedMask = movedMask;
+save(handy.savePath, 'data2', '-v7.3', '-nocompression', '-append');
 
 end
 

@@ -1,4 +1,4 @@
-function [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(varargin)
+function [D, tform, movedIm_partway, movedMask] = registerSerialSections_part2_nonrigid(varargin)
 %syntax: [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(varargin)
 
 %% Part 2 of registration: nonrigid geometric transformation with control points placed EXCLUSIVELY programically .
@@ -10,9 +10,6 @@ function [D, tform, M_Im, movedMask] = registerSerialSections_part2_nonrigid(var
 % applied simultaneously to the image and its mask.
 
 %Michael Glendinning, 2023
-% note - this code works and does so quickly!  but I need I have not finished testing a
-% full cohort to see how it handles diversity!
-
 
 tic;
 
@@ -21,8 +18,10 @@ warning('off', id);
 
 %% load up variables saved
 if nargin ~= 3
-    ld = load('/your/Dir/registration_data_sampleID_stain1_stain2.mat',...
+   ld = load('/Users/jglendin/Dropbox - Michael/Dropbox/human ms code/my code/registration_data_B_EGFL7_PLP.mat',...
         '-mat');
+    % ld = load('/your/Dir/registration_data_sampleID_stain1_stain2.mat',...
+     %   '-mat');
     myNEWimages = ld.images_part1;
     fixedMat = ld.fixedMat;
     movingMat = ld.movingMat;
@@ -99,7 +98,7 @@ coordXY_pgon_fixed_splitsides(2).points = pgon_fixed.Vertices(cornerIndxFixed(1,
 coordXY_pgon_fixed_splitsides(3).points = pgon_fixed.Vertices(cornerIndxFixed(4, :): cornerIndxFixed(3, :),:);
 coordXY_pgon_fixed_splitsides(4).points = pgon_fixed.Vertices(cornerIndxFixed(3, :): cornerIndxFixed(2, :),:);
 
-%% Use curve fitting to place a LOT of perfect, amazing, leader points
+%% Use curve fitting to place a LOT of perfect, amazing, control points
 %% (i.e. control points programmically positioned evenly along the entire edge of the tissue.
 % Because we've already coarse aligned the images, these points should be well
 % aligned across images...
@@ -120,7 +119,7 @@ evenlydistFixed = zeros(pointsPerSide*4,2,'double');
 midGrid_m{4} = zeros(3,2);
 midGrid_f{4} = zeros(3,2);
 
-%% ||~~~~-~~~~||~~~~-~~~~|| START of HUGE LOOP ||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||
+%% ||~~~~-~~~~||~~~~-~~~~|| START of LOOP ||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||
 %%      ||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||~~~~-~~~~||
 
 counter = 1;
@@ -175,8 +174,8 @@ gridpoints_f = [fside1,fside2];
 moving_coordinates = solveForGridPoints(gridpoints_m);
 fixed_coordinates = solveForGridPoints(gridpoints_f);
 
-cp_moving = [cPointsMoving; moving_coordinates];
-cp_fixed = [cPointsFix; fixed_coordinates];
+cp_moving = [evenlydistMoving; moving_coordinates];
+cp_fixed = [evenlydistFixed; fixed_coordinates];
 
 %% Refine control points placement as necessary using this GUI!
 close all force
@@ -201,14 +200,14 @@ end
     tform2_poly2 = cp2tform(cp_moving, cp_fixed, 'polynomial', 2);
     tform3_poly3 = cp2tform(cp_moving, cp_fixed, 'polynomial', 3);
 
-
 imReg1 = imtransform(MOVING_gray,tform1_lwn,'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1, 'FillValue', 1);
 imReg2 = imtransform(MOVING_gray,tform2_poly2,'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1,'FillValue', 1);
 imReg3 = imtransform(MOVING_gray,tform3_poly3,'Xdata',[1 size(MOVING_mask,2)],'YData',[1 size(MOVING_mask,1)],'XYscale',1,'FillValue', 1);
 
 % call GUI to select best nonrigid transformation
-choice = evaluate3nonRigidTransformations(imReg1, imReg2, imReg3, IMG_gray);
-
+choice = evaluate3nonRigidTransformations(MOVING_gray, imReg1, imReg2, imReg3, IMG_gray);
+disp(num2str(choice));
+assert(isscalar(choice));
 switch choice
     case 11
         nearlyRegisteredMovingImage = imReg1;
@@ -231,49 +230,112 @@ close all force
 pause(0.5);
 
 %% FINAL REGISTRATION STEP!! Diffeomorphic demons
-[D, M_Im] = imregdemons(nearlyRegisteredMovingImage, IMG_gray, [500, 320, 100, 20], 'PyramidLevels', 4, 'DisplayWaitbar', false);
+tic;
+[D, movedIm_partway] = imregdemons(nearlyRegisteredMovingImage, IMG_gray, [750, 500, 30], 'PyramidLevels', 3, 'DisplayWaitbar', false, 'AccumulatedFieldSmoothing' , 1.25);
+[D2, ~] = imregdemons(IMG_gray, movedIm_partway, [750, 500, 30], 'PyramidLevels', 3, 'DisplayWaitbar', false, 'AccumulatedFieldSmoothing' , 1.25);
+toc;
+D2inv = D2.*-1;
+movedIm = imwarp(movedIm_partway, D2inv);
+movedMask_partway = imwarp(MOVINGMaskReg, D);
+movedMask = imwarp(movedMask_partway, D2inv);
 
-sumUnmovedMask = sum(sum(MOVINGMaskReg));
-movedMask = imwarp(MOVINGMaskReg, D);
+% sz_im = size(movedIm, 1:2);
+% [x,y ] = meshgrid(1:1:sz_im(2), 1:1:sz_im(1));
+% figure;
+% quiver(x,y,D2(:,:,1), D2(:,:,2));
 
-%propPixelsLeft = sum(sum(MOVINGMaskReg & movedMask))/sumUnmovedMask; % the smaller the more movement
-cc1= corrcoef(M_Im,nearlyRegisteredMovingImage);
-cc2= corrcoef(movedMask, IMG_mask);
-remainingMovement = sum(sum(~movedMask & IMG_mask))/ sum(sum(IMG_mask));
+%sum of squared differences
+ssd0 = immse(nearlyRegisteredMovingImage, IMG_gray) * numel(nearlyRegisteredMovingImage);
+deltaSSD = ssd0 - immse(movedIm, IMG_gray) * numel(movedIm);
+partway_deltaSSD = ssd0 - immse(movedIm_partway, IMG_gray) * numel(movedIm_partway);
 
-disp(strcat(' correlation between images ', num2str(cc1), 'and between masks its: ', num2str(cc2)));
-disp(strcat(num2str(remainingMovement), ' remaining movement, expressed as a percentage of the fixed mask'));
+% Pearsons correlation coefficient
+cor0 = corr2(nearlyRegisteredMovingImage, IMG_gray);
+deltaCor = corr2(movedIm, IMG_gray)/cor0;
+partway_deltaCor = corr2(movedIm_partway, IMG_gray)/cor0;
+
+ccMoved= corr2(movedIm,nearlyRegisteredMovingImage);
+ccFinalIms = corr2(movedIm, IMG_gray);
+ccFinalMasks= corr2(movedMask, IMG_mask);
+
+%Jaccard Distance: intersection over union
+jacc_mask_partway = 1 - sum(sum(movedMask_partway & IMG_mask)) / sum(sum(movedMask_partway | IMG_mask));
+jacc_masks = 1 - sum(sum(movedMask & IMG_mask)) / sum(sum(movedMask | IMG_mask));
+
+disp(strcat(' correlation between final moving and fixed images ', num2str(ccFinalIms), 'and between their respective masks: ', num2str(ccFinalMasks)));
+disp(strcat(' Pearsons correlation between moved images, before and after both demons is : ', num2str(ccMoved)));
+disp(strcat(num2str(deltaCor), ' is the percent change in Pearsons Corr. Coef before and after both Demons (=after / before)'));
+disp(strcat(num2str(deltaSSD), ' is the change in sum squared differences before and after both Demons (=before-after)'));
+disp(strcat(num2str(partway_deltaCor), ' is the percent change in Pearsons Corr. Coef before and after just the 1st Demons (=after / before)'));
+disp(strcat(num2str(partway_deltaSSD), ' is the change in sum squared differences before and after 1st Demons (=before-after)'));
+disp(strcat(num2str(jacc_masks), ' is the jaccard distance of the image masks after Both runs'));
+disp(strcat(num2str(jacc_masks), ' is the jaccard distance of the image masks after Both runs'));
+disp(strcat(num2str(jacc_mask_partway), ' is the jaccard distance of the image masks PARTWAYS'));
+
+
 
 
 %% Visualization #3 - does not work yet!!!
 
+% create all of your visualizations -- lots of fused overlays
+movingIm_fuse = imfuse(movedIm, nearlyRegisteredMovingImage, 'falsecolor', 'ColorChannels', [2,2,1],  'scaling', 'none');
+partwayImg_fuse = imfuse(movedIm_partway, IMG_gray, 'falsecolor', 'ColorChannels', [2,1,2],'scaling', 'none');
+finalImg_fuse = imfuse(movedIm, IMG_gray, 'falsecolor', 'ColorChannels', [2,1,2], 'scaling', 'none');
+
+movingMasks_fuse = imfuse(movedMask, MOVINGMaskReg, 'falsecolor', 'ColorChannels', [2,2,1], 'scaling', 'none');
+partwayMask_fuse = imfuse(movedMask_partway, IMG_mask, 'falsecolor', 'ColorChannels', [2,1,2], 'scaling', 'none');
+finalMask_fuse = imfuse(movedMask, IMG_mask, 'falsecolor', 'ColorChannels', [2,1,2],'scaling', 'none');
+
+MOVING_startPart2_Im = imfuse(movedIm, myNEWimages{2},  'falsecolor', 'ColorChannels', [2,1,2], 'scaling', 'none');
+MOVING_startPart2_mask = imfuse(movedMask, myNEWimages{1}, 'falsecolor', 'ColorChannels', [2,1,2], 'scaling', 'none');
+
+Dfield = imresize(imbinarize(checkerboard(100)), size(D, 1:2));
+Dfield_part1 = padarray(imwarp(Dfield, D), [10, 10], 1, 'both');
+Dfield_part2alone = padarray(imwarp(Dfield,D2inv), [10, 10], 1, 'both');
+Dfield_combined = padarray(imwarp(Dfield_part1, D2inv), [10, 10], 1, 'both');
+
+% now create the figure;
+
+f3 = uifigure('Visible', 'on');
+set(f3, 'units', 'pixels');
+
+%make the GUI bigger
+%f3_position = get(f3, 'Position');
+f3_position = [10, 10, 1350 800];
+set(f3, 'Position', f3_position);
+
+gl_3 = uigridlayout(f3, [3,5], 'RowHeight', {'1x', '1.1x', 50});
 
 
-
-f3 = uifigure;
-gl_3 = uigridlayout(f3, [3,3]);
-gl_3.RowHeight = {'1x',20};
 butClose = uibutton(gl_3,'push', ...
     'Text','Close The Visualization?',...
     'ButtonPushedFcn', @(~,~) butCloseFcn);
+butClose.Layout.Row = 3; butClose.Layout.Column = 1;
 
-butClose.Layout.Row = 2; butClose.Layout.Column = 2;
+axMovingImsDemons = uiaxes(gl_3);  title(axMovingImsDemons, 'Moving Ims before/after demons');
+axPartwaysDemons = uiaxes(gl_3); title(axPartwaysDemons, {'Fixed Im and Moving Im';'after first half of demons'});
+axFinalDemons = uiaxes(gl_3); title(axFinalDemons, {'Fixed Im and Moving Im';'after both demons run'});
+axAllPart2 = uiaxes(gl_3); title(axAllPart2, 'Comparison input to Part 2 Reg and Output')
+axDfields= uiaxes(gl_3); title(axDfields,{ 'Visualize the Demons field D.' ;'BotRight is the combined'})
+%axDfields.PositionConstraint = 'outerposition';
 
-axImgs = uiaxes(gl_3);  title(axImgs, 'Fixed and Moving Images')
-axMasks = uiaxes(gl_3); title(axMasks, 'Fixed and Moving MASKS')
-axChange = uiaxes(gl_3); title(axChange, 'Moving masks before and after demons algo')
-axChange2 = uiaxes(gl_3); title(axChange2, 'grayImages before and after demons algo')
+ axMovingImsDemons.Layout.Column = [3, 4];   axMovingImsDemons.Layout.Row = 1;
+ axPartwaysDemons.Layout.Column = [1, 2] ;   axPartwaysDemons.Layout.Row = 2; 
+ axFinalDemons.Layout.Column = [3, 4]    ;   axFinalDemons.Layout.Row = 2;
+ axAllPart2.Layout.Column = [1, 2]       ;   axAllPart2.Layout.Row = 1;
+ axDfields.Layout.Column = 5             ;   axDfields.Layout.Row = [1, 3];
+ 
+ axis image;
 
-axChange.Layout.Column = 1; axImgs.Layout.Column = 3; axMasks.Layout.Column = 2;
-axChange.Layout.Row = [2, 3]; axImgs.Layout.Row = [2, 3]; axMasks.Layout.Row = 2;
-axChange2.Layout.Column = 1; axChange2.Layout.Row = 1;
+ 
+imshowpair(MOVING_startPart2_mask, MOVING_startPart2_Im, 'montage', 'Parent', axAllPart2);
+imshowpair(movingMasks_fuse, movingIm_fuse, 'montage', 'Parent', axMovingImsDemons);
+imshowpair(partwayMask_fuse, partwayImg_fuse, 'montage', 'Parent', axPartwaysDemons);
+imshowpair(finalMask_fuse, finalImg_fuse, 'montage', 'Parent', axFinalDemons);
+montage({Dfield_part1, Dfield_part2alone, Dfield_combined}, 'Size', [3,1], 'Parent', axDfields);
 
-%f3.Visible = 'on';
-imshowpair(M_Im, nearlyRegisteredMovingImage, 'falsecolor', 'ColorChannels', [2,2,1], 'Parent', axChange2, 'scaling', 'none');
-imshowpair(M_Im, IMG_gray, 'falsecolor', 'ColorChannels', [1,2,2], 'Parent', axImgs, 'scaling', 'none');
-imshowpair(movedMask, IMG_mask,'falsecolor', 'ColorChannels', [2,1,2], 'Parent', axMasks, 'scaling', 'none');
-imshowpair(MOVINGMaskReg, movedMask, 'falsecolor', 'ColorChannels', [2,2,1], 'Parent', axChange, 'scaling', 'none');
-drawnow ;
+drawnow nocallbacks;
+f3.Visible = 'on';
 
 uiwait
 close all force
@@ -285,7 +347,7 @@ end
 
 
 
-function choice = evaluate3nonRigidTransformations(imReg1, imReg2, imReg3, IMG_gray)
+function choice = evaluate3nonRigidTransformations(MOVING_gray, imReg1, imReg2, imReg3, IMG_gray)
 
 hFig = uifigure(...
     'Name', 'Registration', ...
@@ -327,11 +389,30 @@ title(ax1, 'LWM method');
 title(ax2, 'Polynomial, deg 2');
 title(ax3, 'Polynomial, deg 3');
 
-lbl1 = uilabel(gl, 'Text', num2str(corr2(imReg1, IMG_gray)));
+% sum of squared differences
+ssd0 = immse(MOVING_gray, IMG_gray) * numel(MOVING_gray);
+ssd1 = ssd0 - immse(imReg1, IMG_gray) * numel(imReg1);
+ssd2 = ssd0 - immse(imReg2, IMG_gray) * numel(imReg2);
+ssd3 = ssd0 - immse(imReg3, IMG_gray) * numel(imReg3);
+
+% correlation
+cor0 = corr2(MOVING_gray, IMG_gray);
+cor1 = corr2(imReg1, IMG_gray)/cor0;
+cor2 = corr2(imReg2, IMG_gray)/cor0;
+cor3 = corr2(imReg3, IMG_gray)/cor0;
+
+disp('better registration should result in >> 1 delta corr, less than 1 means image is now less aligned (=corr2(im_reg, fixde)/corr2(im, fxed))');
+disp('better reg. should also result in higher change sum of squared differences (=SSD(im, fxed)-SSD(im_reg, fxed))');
+
+text1 = strcat('deltaSSD = ' ,num2str(ssd1),'delta corr = ' ,num2str(cor1));
+text2 = strcat('deltaSSD = ' ,num2str(ssd2),'delta corr = ' ,num2str(cor2));
+text3 = strcat('deltaSSD = ' ,num2str(ssd3),'delta corr = ' ,num2str(cor3));
+
+lbl1 = uilabel(gl, 'Text', text1);
 lbl1.Layout.Column = 1;
-lbl2 = uilabel(gl, 'Text', num2str(corr2(imReg2, IMG_gray)));
+lbl2 = uilabel(gl, 'Text', text2);
 lbl2.Layout.Column = 2;
-lbl3 = uilabel(gl, 'Text', num2str(corr2(imReg3, IMG_gray)));
+lbl3 = uilabel(gl, 'Text', text3);
 lbl3.Layout.Column = 3;
 
 lbl1.Layout.Row = 2; lbl2.Layout.Row = 2; lbl3.Layout.Row = 2;
@@ -398,19 +479,21 @@ plot(cp(1:sz,1), cp(1:sz,2), [colors{1} '*'], 'MarkerSize', 10);
 plot(cp(sz+1:2*sz,1), cp(sz+1:2*sz,2), [colors{2} '*'], 'MarkerSize', 10);
 hold off;
 
-disp('Please click on any misaligned control points to adjust their position. Press any key when finished.');
-
-while true
+disp('Please click on any misaligned control points to adjust their position. Press any key besides enter to finish.');
+loopy=1;
+while loopy == 1
     [x, y, butt] = ginput(1);
-    if butt ~= 1 || any(size([x,y])==0) % exit loop if button other than left-click is pressed
-        return;
+    if isempty(butt) || any(~isempty(butt)& butt~=1) || numel([x,y])==0  % exit loop if button other than left-click is pressed
+        loopy = 9;
+        continue
     else
         
         % Find the nearest control point to the clicked position
         try
             distances = sqrt(sum(bsxfun(@minus, [x y], cp).^2, 2));
         catch
-            return
+             loopy = 9;
+            continue
         end
         [~, idx] = min(distances);
         
@@ -428,8 +511,7 @@ while true
         end
         oldx = curr_cp(idx, 1);
         oldy = curr_cp(idx, 2);
-        
-        
+               
         cla;
         imshowpair(MOVING_gray, IMG_gray, 'blend');
         %instead of deleting the point and messing up our index values. we just

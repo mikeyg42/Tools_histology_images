@@ -1,4 +1,5 @@
 function outOfBoundsMask = runLevelSet(rgbImage)
+% outOfBoundsMask = runLevelSet(rgbImage)
 % This function implements a very simply formualtion of the level sets
 % algorithm. syntax is: outOfBoundsMask = runLevelSet(rgbImage)
 % -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -18,9 +19,6 @@ function outOfBoundsMask = runLevelSet(rgbImage)
 %    as is recommended by the text of the reference text (see below). The reset would 
 %    ensure the level-set function stays a sign-distance fuction throughout
 %    iterations. But in testing my im's, segmentation worked without it well enough.
-%  - I've written a script to fill in any gaps left by the crude
-%    thresholding approach I use to binarize the result, which I call in
-%    the try/catch - it "catches" when there are no gaps to be filled.
 %  - After the level set algorithm completes, its obvious upon inspection that,
 %    as a result of the blurring, we sometimes do initially to get a strong
 %    boundary and as a result, our segmentation is not precisely lined-up with input

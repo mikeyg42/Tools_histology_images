@@ -1,29 +1,35 @@
-function binaryMask = finalizeMASK(binaryMask,imAdjRGB)
+function binaryMask = finalizeMASK(mySettings, binaryMask,imAdjRGB)
 % This function is called refines an initial attempt making mask (binaryMask),
 % outlining a particular image (imAdjRGB). Will show overlay of mask on image
 % and a GUI with various options to refine the mask, or redraw it entirely. 
 % Select DONE to exit
-%Michael Glendinning, 2023
-close all force
 
+%Michael Glendinning, 2023
+% ======================================================================== %
+
+close all force
 
 % we don't need to reredefine this variable each time we loop
 listMethods = {'DONE',...
-    'Level Set Method segmentation',...
+    'Simple thresholding, plus some gentle cleaning',...
     'Color segment w/ graydiffweight',...
+    'Segment with various vector calc tools'
+    'Full color segmentation',...
     'Double threshold (hysteresis)',...
     'Color segment with geodesics, w/ provided foreground sample',...
-    'Segment w/ Morphology',...
+    'Segment w/ Morphological transformations',...
+    %'Level Set Method segmentation',...
     'k means color clustering segmentation',...
     'Texture segmentation options GUI (no Gabor)',...
-    '(needs work still) Texture segmentation Gabor+LBP, then FCM',...
-    'thresholding / imclose, refined as polyshape',...
+    %'(needs work still) Texture segmentation Gabor+LBP, then FCM',...
     'refine : dilate mask',...
     'refine : just active contour (ie snakes)',...
     'refine : fill in holes',...
     'refine : select only the largest connected blob',...
-    'refine : morphology; opening-recon. and closing-recon', ...
+    'refine : morphology; opening-recon. and closing-recon',...
     'refine : adjust the vertices of the largest blob',...
+    'refine : multiple blobs? check for outliers',...
+    'NOT DONE! Save as is and close',...
     };  
  
 % Sanity Check - make sure mask and image are the same size!
@@ -35,7 +41,7 @@ if size1 ~=size2
 end 
 %--------------- Make the list dialogue gui loop -----------------
 % save time by making image display figure outside the loop
-fig1 = figure; 
+fig1 = uifigure('CloseRequestFcn',@guiCloseFunction); 
 axy = axes(fig1);
 
 %initialize visualization
@@ -46,8 +52,7 @@ hold off
 
 % The creation of a GUI is within a while loop -- the exit condition for
 % which is "MyCounter" becoming positive. This change can onlynhappen when 
-% DONE is picked off the menu, causing change in an appdata associated var
-% attached to the parent of the figure, ie "the root", the handle of which is 0.
+% DONE is picked off the menu. 
 
 % Until DONE is picked and the appdata feeds a positive value to MyCounter, 
 % after a selection is made and cooresponding function runs, the loop
@@ -55,29 +60,26 @@ hold off
 
 drawnow;
 
-MyCounter = -10;
-while MyCounter < 0
+while false
     
     % this creates the modal dialogue GUI with the list of segementation options.
     [indx, tf] = listdlg('SelectionMode', 'single',...
         'ListString', listMethods,...
-        'ListSize', [350, 200]);
+        'ListSize', [360, 210],...
+        'CancelString', 'Quit without saving');
     
     if tf == 1
         ImProcessing_choice = listMethods{indx};
-        
+        close all force
         if strcmp(ImProcessing_choice,'DONE')
-            MyCounter = 10;
-            close all force
-            
+            break
+
         else
             outOfBoundsMask_old = binaryMask;
             
-            close all force
+            binaryMask = imProcessingResponse(mySettings, outOfBoundsMask_old, ImProcessing_choice, imAdjRGB);
             
-            binaryMask = imProcessingResponse(outOfBoundsMask_old, ImProcessing_choice, imAdjRGB);
-            
-            fig2 = figure('Visible', 'off');
+            fig2 = uifigure('Visible', 'off', 'CloseRequestFcn',@guiCloseFuntion);
             axy2 = axes(fig2);
             
             %show new boundary in yellow, old boundary in red
@@ -90,10 +92,17 @@ while MyCounter < 0
             fig2.Visible = 'on';
             drawnow;
         end
-    elseif tf == 0
+    elseif tf == 0 
+% tf=0 when: 
+        % - 'x'-out of the GUI or use ESC to close window
+        % - 'cancel' button is clicked
+        % - 'not done! save and quit' is selected  off the list
         close all force
-        disp('GUI closed without selection made. Reopening  now...');
-        fig3 = figure;  axy3 = axes(fig3);
+        
+        %recreate the figure
+        fig3 = uifigure('CloseRequestFcn',@guiCloseFuntion);  
+        axy3 = axes(fig3);
+        
         imshow(imAdjRGB,'Parent',axy3, 'Border', 'tight');
         hold on
         visboundaries(axy3, binaryMask, 'Color', 'r'); hold off
@@ -117,14 +126,13 @@ end
 % V                V      OUTPUT = outOfBoundsMask (class binary; foregr(1)/backgr(0))
 % -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=  %
 
-function outOfBoundsMask = imProcessingResponse(outOfBoundsMask, choice, imgCurrent)
+function outOfBoundsMask = imProcessingResponse(mySettings, outOfBoundsMask, choice, imgCurrent)
 
 switch choice
-   case 'Level Set Method segmentation' 
-        outOfBoundsMask = runLevelSet(imgCurrent);
         
-    case 'thresholding / imclose, refined as polyshape'
-        outOfBoundsMask = binarizeTissueMG(imgCurrent) ;
+    case 'Simple thresholding, plus some gentle cleaning'
+        outOfBoundsMask = binarizeTissueMG(imgCurrent);
+        outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'Double threshold (hysteresis)'
          H = fspecial('gaussian',[3,3],3);
@@ -134,9 +142,19 @@ switch choice
         
         outOfBoundsMask = hysteresisThreshold_wMorph(imageB);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
-        
-        
+    
+    case 'Full color segmentation'
+        imgCurrent = imresize(imgCurrent, 0.5, {@oscResampling, 4});
+        [BWmask, ~] = fullColorSegmentation(imgCurrent);
+        BWmask = imresize(BWmask, 2, {@oscResampling, 4});
+    
+    case 'Segment with various vector calc tools'
+        myIm_resized = imresize(imgCurrent, round(5000/max(size(imgCurrent, 1:2)), 3) , {@oscResampling, 4} );
+        outOfBoundsMask = vectorCalcSegment(myIm_resized);
+        outOfBoundsMask = imresize(outOfBoundsMask, size(imgCurrent, 1:2) , {@oscResampling, 4});
+
     case 'Color segment w/ graydiffweight' 
+        
         outOfBoundsMask = weightingPixelIntensityDiffs_RGBseg(imgCurrent);
          
     case 'refine : dilate mask'
@@ -173,7 +191,10 @@ switch choice
     case '(needs work still) Texture segmentation Gabor+LBP, then FCM'
         gray_img = rgb2gray(imgCurrent);
         outOfBoundsMask = textureSeg_FCM(gray_img);
-        
+    
+    case 'Level Set Method segmentation' 
+        outOfBoundsMask = runLevelSet(imgCurrent);
+
     case 'refine : morphology; opening-recon. and closing-recon'
         se3 = strel('disk',21);
         Ierode = imerode(outOfBoundsMask,se3);
@@ -184,7 +205,7 @@ switch choice
         Iopenbyrecon_closingbyrecon = imcomplement(Iopenbyrecon_closingbyrecon);
         outOfBoundsMask = imregionalmax(Iopenbyrecon_closingbyrecon);
         
-        %??? include?! hmmmm
+    case 'refine : multiple blobs? check for outliers'
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'refine : adjust the vertices of the largest blob'
@@ -196,17 +217,62 @@ switch choice
     case 'refine : select only the largest connected blob'
         outOfBoundsMask = bwareafilt(outOfBoundsMask, 1);
         
-    case 'Segment w/ Morphology'
+    case 'Segment w/ Morphological transformations'
         outOfBoundsMask = morphologySegment(imgCurrent);
+    
+    case 'NOT DONE! Save as is and close'
+        [filepath, ~, ~] = get_filepath(mySettings.directories.rawData, mySettings.activeFilename);
+        info = imfinfo({filepath});
+        segment_SaveFunc(mySettings, info, outOfBoundsMask, imgCurrent);
+        close all force
+        drawnow 
+
+        error('Not an error, just an update: Execution stopped by the user. Files were saved and progress can be resumed at a later time. Cheers!');
+
 end
 
-% Just for my sanity...
-
+% sanity check #1
 outOfBoundsMaskF = imresize(outOfBoundsMask, size(imgCurrent,1:2));
 
-% similarly this is vestigal from debugging, but gives me peace of mind so its staying!
+%sanity check #2
 if ndims(outOfBoundsMaskF)>2
     outOfBoundsMaskF = outOfBoundsMaskF(:,:,1);
 end
 
-end %go back to the while loop in the above function (@finalizeMask)
+end %end improcessing function. returns now to parent function workspace (@finalizeMask))
+
+
+
+function guiCloseFuntion(src, ~, varargin)
+% guiCloseFuntion(src, evt, varargin)
+% 
+% This is a callback function for the GUIs to prevent bugs associated with inadvertent
+% closing of GUIs and/or mis-selection of a particular choice. 
+if nargin>2
+    fHandle = varargin{1};
+else
+    fHandle = src;
+end
+
+mymessage = sprintf(['<html> <font size="5"]><b>Are your sure you would like to close right now? without saving?!</b></font<br><br>' ...
+'<font size="3">You can save by selecting <font color="blue"><i>DONE</i></font> or <font color="blue"><i>NOT DONE</i></font> on the list to initiate this. </font></html>']);  
+
+confirmation = uiconfirm(fHandle, mymessage,'Confirm Close',...
+    'Options', {'Yes, get me out of here, no saving', 'No, Ive changed my mind'},...
+    'DefaultOption', 'No, Ive changed my mind',...
+    'Icon', 'warning' ,...
+    'CancelOption', 'No, Ive changed my mind',...
+    'Interpreter', 'html');
+
+switch confirmation
+    case 'Yes, get me out of here, no saving'
+       
+        close all force
+        error('Not really an error, just an update: Execution stopped by the user and, as requested, not saved. Cheers!');
+
+    case 'No, Ive changed my mind'
+        return;
+end
+end
+
+ 

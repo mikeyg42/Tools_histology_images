@@ -1,4 +1,4 @@
-function finalMask = textureFilterGUI(varargin)
+function finalMask = textureFilterGUI(imgIn, varargin)
 % theMask = textureFilterGUI(img)
 % A reliable semi-automated segmentation tool for grayscale images
 % Grayscale images are input, and then 8 different possible binary
@@ -26,9 +26,7 @@ function finalMask = textureFilterGUI(varargin)
 % Michael Glendinning, 2023
 warning('off','MATLAB:polyshape:repairedBySimplify');
 
-testim = imread('/Users/jglendin/Dropbox - Michael/Dropbox/processedMSimages/MS_B_EGFL7_adjustedRGBImage_v1.tiff');
-testim = imresize(testim, 0.5, {@oscResampling, 4});
-imgPre = preprocessRawRGBims(testim, 0.5);
+imgPre = preprocessRawRGBims(imgIn, 0.5);
 img = locallapfilt(im2single(imgPre), 0.02, 1.8,'NumIntensityLevels', 200);
 
 se1 = strel(ones(3));

@@ -8,7 +8,9 @@ if sz(3)>3
 end
 
 % this converts to double and rescaled everything do fall in [0,1] range.
-myImage = ensureDoubleScaled(myImage, true);
+if ~isfloat(myImage)
+myImage = im2double(myImage);
+end
 
 %downsampling image by scale factor. shink too much!! just enough that code will run....
 if scaleFactor ~=0
@@ -16,5 +18,5 @@ newSize = ceil([sz(1), sz(2)].*scaleFactor);
 myImage = imresize(myImage, newSize,{@oscResampling, 4}); %downsampling
 end
 
-imAdjRGB = backgroundCorrectRGB(myImage, 'RGB_stacked'); %removing background and mosaic artifacts
+imAdjRGB = evenFasterCorrect(myImage); %removing background and mosaic artifacts with tophat filter
 end

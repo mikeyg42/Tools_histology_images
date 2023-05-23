@@ -1,6 +1,35 @@
-function  choosingROIs
+function [FINmasks, rectums, allROIsamples] = choosingROIs
 close all force
 warning('off', 'all');
+% % settings
+% mySettings.chooseROI.numROIs
+% mySettings.chooseROI.sizeROI
+% mySettings.chooseROI.roi_additionalMasks
+% % save dir
+% mySettings.directories.saveDestination_rois/
+% % load dir
+% mySettings.directories.saveSegm_adjImages
+% mySettings.directories.saveSegm_foregroundMask
+% % RAW data dir
+% mySettings.directories.rawData
+% % file formats
+% mySettings.fileFormats.chooseROI_saveFMT_allROIs;
+% mySettings.fileFormats.chooseROIS_saveFMT_roiLocations;
+%
+
+
+% fig = figure;
+% set(fig,'doublebuffer','off');
+%
+% ax1 = axes(fig);
+% imDisp = imshow(imgCurrent, 'Parent', ax1);
+%
+% set(ax1, 'xlimmode','manual',...
+% 'ylimmode','manual',...
+% 'zlimmode','manual',...
+% 'climmode','manual',...
+% 'alimmode','manual',...
+% 'Units', 'pixels');
 
 %% the preamble
 
@@ -8,9 +37,11 @@ warning('off', 'all');
 % here used.
 mySettings = setts_and_prefs;
 
+
 % call your parseDataset function, which interprets settings and loads up the dataset into
 % a structure called "data"
 data = parseDataset(mySettings, 'choosingROIs'); % inside data will be a image datastore from which you can read in images
+
 
 % load up and check over your input files
 imgCurrent = readimage(data.rgbIMDS, 1);
@@ -25,8 +56,11 @@ totalBlobArea = sum(imcomplement(maskCurrent(:)));
 close all
 
 %initialize mask for storing locations and counter of ROIs
-numSubsets=1; % the counter fr while loop
+%allROIsamples= zeros(size(imgCurrent, 1:2));
+numSubsets=1;
+%recVerts{mySettings.chooseROI.numROIs} = [];
 FINmasks{mySettings.chooseROI.numROIs} = [];
+%tooManyROIs = (1+mySettings.chooseROI.numROIs);
 
 
 % Calls the initialization routine, which comes up with a good 1st pass at a solution
@@ -731,7 +765,7 @@ function direction = queryBlobs(masks, centers, radii, binMask_blob, binMask_tis
         combinedData = data_w_zeros;
         else
        combinedData = combinedData+circshift(data_w_zeros, tri-1);
-        end
+       end
        end
 
        %% NOTE ALL OF THESE X VALUES ARE OFF BY -2.5, NEED TO ADD THAT BEFORE USING
@@ -793,7 +827,7 @@ Update(binMask_blob, triangulation1, interp_noPad, direction)
     
 
 
-    end
+
 end
 
 % ==========================================================================

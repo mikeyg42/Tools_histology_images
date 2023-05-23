@@ -43,9 +43,9 @@ function imSegmentation_mosaics
 % But, after acquisition, your solution depends on how your downstream
 % analyses's sensitivity. Here I've addressed the picnic table effect with a
 % background correction algorithm (using the tophat filter). If this is
-% insufficient, you can modify preprocessingRawRGBims.m and backgroundCorrectRGB.m
-% And for more serious problems, check out the open source dockerized
-% workflow called MCMICRO, which uses the program BaSiC, (also an ImageJ plugin).
+% insufficient, you can modify preprocessingRawRGBims.m and evenFasterCorrectiuon.m
+% And for more serious problems, check out the open source, dockerized
+% workflow MCMICRO, which uses a program called BaSiC. BaSiC is also available as an ImageJ plugin.
 
 % Michael Glendinning, 2023
 %--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%--%

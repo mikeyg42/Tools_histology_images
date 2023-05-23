@@ -205,7 +205,10 @@ switch SCRIPT
             for p = 1:nImages
                 % start looping through the RGB images one at a time to find associated masks
 
-                prefix = allRGB_prefix{p}; 
+                rgbFile =  ;
+                [~, RGB_basefilenames, ~] = fileparts(RGB_basefilenames(p));
+                thefileparts = strsplit(RGB_basefilenames, '_');
+                prefix = strjoin(thefileparts(1:3), '_');
 
                 % Search for the mask image filename that matches prefix
                 maskIm_matches = dir(fullfile(mysettings_prefs.directories.saveSegm_foregroundMask, [prefix, '*' , mysettings_prefs.fileFormats.segm_saveFMT_foregroundMask]));

@@ -1,0 +1,102 @@
+function [FINmasks, rectums, allROIsamples] = choosingROIs
+% % settings
+% mySettings.chooseROI.numROIs
+% mySettings.chooseROI.sizeROI
+% mySettings.chooseROI.roi_additionalMasks
+% % save dir
+% mySettings.directories.saveDestination_rois/
+% % load dir
+% mySettings.directories.saveSegm_adjImages
+% mySettings.directories.saveSegm_foregroundMask
+% % RAW data dir
+% mySettings.directories.rawData
+% % file formats
+% mySettings.fileFormats.chooseROI_saveFMT_allROIs;
+% mySettings.fileFormats.chooseROIS_saveFMT_roiLocations;
+% 
+close all
+[mySettings] = setts_and_prefs;
+
+data = parseDataset(mySettings, 'choosingROIs'); % inside data will be a image datastore from which you can read in images
+
+
+%% ensure all your information is updated and available
+
+    
+
+% load up and check over your input files
+
+    
+
+
+%%
+
+
+
+%<not done>
+
+
+imgCurrent = readimage(data.rgbIMDS, 1);
+imgCurrent = im2double(imgCurrent);
+maskCurrent = readimage(data.maskIMDS, 1); 
+if size(imgCurrent, 1:2)~= size(maskCurrent)
+    maskCurrent = imresize(maskCurrent, size(imgCurrent,1:2), {@oscResampling, 4});
+end
+
+% fig = figure; 
+% set(fig,'doublebuffer','off');
+% 
+% ax1 = axes(fig);
+% imDisp = imshow(imgCurrent, 'Parent', ax1);
+% 
+% set(ax1, 'xlimmode','manual',...
+% 'ylimmode','manual',...
+% 'zlimmode','manual',...
+% 'climmode','manual',...
+% 'alimmode','manual',...
+% 'Units', 'pixels');
+
+%% start of loop to generate 10 ROI's
+
+%initialize mask for storing locations and counter of ROIs
+allROIsamples= zeros(size(imgCurrent, 1:2));
+numSubsets=1; 
+recVerts{mySettings.chooseROI.numROIs} = [];
+FINmasks{mySettings.chooseROI.numROIs} = [];
+%tooManyROIs = (1+mySettings.chooseROI.numROIs);
+
+close all
+tic;
+initialSolution = circlePacking_initiate(maskCurrent, mySettings.chooseROI.sizeROI);
+toc;
+
+
+while numSubsets < 7
+
+    win = randomCropWindow2d(size(imgCurrent, 1:2), mySettings.chooseROI.sizeROI);
+
+    xi = [win.XLimits(1); win.XLimits(2); win.XLimits(2); win.XLimits(1)];
+    yi = [win.YLimits(1); win.YLimits(1); win.YLimits(2); win.YLimits(2)];
+    maskRectRoi = roipoly(imgCurrent, xi, yi);
+    
+    MASKintersect = maskRectRoi.*maskCurrent;
+    overlappingROIs = maskRectRoi.*allROIsamples;
+    
+    if sum(MASKintersect(:)) == sum(maskRectRoi(:)) && sum(overlappingROIs(:)) == 0
+       
+    allROIsamples = allROIsamples | maskRectRoi;
+    FINmasks{numSubsets} = maskRectRoi;
+    recVerts{numSubsets} = [xi, yi];
+
+    numSubsets = numSubsets+1;
+    % imshowpair(imgCurrent,allROIsamples);
+
+    %    drawnow expose
+    close all
+    tic;
+    initialSolution = circlePacking_initiate(maskCurrent, mySettings.chooseROI.sizeROI);
+    toc;
+    end
+end
+
+figure; imshowpair(allROIsamples, imgCurrent);

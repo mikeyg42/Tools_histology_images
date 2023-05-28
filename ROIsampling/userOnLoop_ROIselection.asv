@@ -1,4 +1,4 @@
-function [allROIsamples, extractedROIs] = userOnLoop_ROIselection(fileNumber)
+function [allROIsamples, FINmasks, extractedROIs] = userOnLoop_ROIselection(fileNumber)
 % NOTE this is NOT the function one should run to start selecting ROIs. Instead, try
 % runROIselection.m instead! This just contains a bunch of the functions that are useless
 % outside of this specific task; because of this, I figured it was cleaner to lump them

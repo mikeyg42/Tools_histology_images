@@ -6,22 +6,33 @@ function [mySettings] = setts_and_prefs
 
 %set these directory locations for your local data storage
 
-% SEGMENTATION draws from "directOfImages" and saved saveDestination_adjImages 
-% the corrresponding masks are saved in saveDestination_foregroundMask.
+% SEGMENTATION draws from "directOfImages", requiring at least 1 raw image. 
 
-% REGISTRATION requires 2 images and 2 masks, which it usually pulls out of
-% the 2 folders SEGMENT saved into.
+% REGISTRATION requires 2 images and their cooresponding binary masks. Usually, 
+% I reset the sources folders to be the output folder from segmentation before 
+% running this
 
- % ======================================================================= %  
+% ROI_SLECTION requires 1 image and its cooresponding mask. 
 
-% Directories!:
-
+ % ====================== FILE PATHS ===================================== %  
+% INPUT: 
+        % Path to where all of your images are stored:
 directOfImages          = '/Users/mikeglendinning/Desktop/processedMSimages/';
-saveSegm_adjImages      = '/Users/mikeglendinning/Desktop/processedMSimages/'; 
-saveSegm_foregroundMask = '/Users/mikeglendinning/Desktop/processedMSimages/';
-saveRegistraion         = '/Users/mikeglendinning/Desktop/processedMSimages/';
-saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/';
 
+% OUTPUT
+        % option 1. Specify file path to where output is saved:
+saveSegm_adjImages      = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput'; 
+saveSegm_foregroundMask = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
+saveRegistraion         = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
+saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
+        % option 2. leave these blank/ignore the above and we will just make a new directory
+        % within the input folder. (Change to FALSE if you want to specify a precise path)
+makeSaveDir_yn          = true; % <-- a value of TRUE takes priority over any path specified above
+
+% ^ NOTE: if any of the 4 save paths are the SAME as directOfImages, then a new
+% save directory will be made regardless. This is because the code will get confused after
+% a file is saved in directOfImages, and will confuse your output with a new input and try
+% to rerun it...
  % ======================================================================= %  
 
 % File Formats:
@@ -34,7 +45,7 @@ saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/';
     segm_saveFMT_adjImage           = '.tiff'; 
     segm_saveFMT_foregroundMask     = '.png'; 
 
-    reg_saveFMT_adjImage            = segm_saveFMT_adjImage;
+    reg_saveFMT_adjImage            = segm_saveFMT_adjImage; 
     reg_saveFMT_foregroundMask      = segm_saveFMT_foregroundMask;
 
     chooseROI_saveFMT_allROIs       = '.tiff';
@@ -50,7 +61,7 @@ saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/';
 % the specific sample you'd like to process: sample ID and stain ID(s)
 % - Ensure that there are not multiple files with the same identifiers indicated
 
-doNOTloopThroughDirectory_justUseThis = false;
+doNOTloopThroughDirectory_justUseID = false; 
 % This works for ChoosingROIs and Segmentation. 
 
   %1.
@@ -66,7 +77,7 @@ doNOTloopThroughDirectory_justUseThis = false;
 % Segmentation -- %note that in the .m file for 
 
     % a 1.25GB image takes ~1-2mins after it has been scaled down 2.8
-        seg_scaleFactor = 2.4;
+        seg_scaleFactor = 2.7;
 
     % save scaled downimage? or try to resample image back to original size before save?
         seg_resizeBig = false;
@@ -80,49 +91,49 @@ doNOTloopThroughDirectory_justUseThis = false;
         seg_doubleCheckSavedMasks = true;
     
     % optional - include a prefix identifier for saved files. It must start with an underscore!
-         seg_versionID = '_v2';  %can also be left blank with char() 
+         seg_versionID = '_v1';  %can also be left blank with char() 
 
         
  % ======================================================================= %  
 
 % Registration  --
 
-    % StainIDs for moving and fixed
+    % The identifing identification information for each stain (moving and fixed). 
         reg_movingID = 'CD31';
         reg_fixedID  = 'PLP' ;
 
-    % Include optional step where a GUI opens to mediate manual coarse adjust rotation??
+    % Include optional step in which a GUI opens to adjust manual coarse adjust rotation??
         % This is necessary if and only if your images might be > 90degrees off
         reg_coarseAdj = true;
 
-    % Opt to include another optional step in which a GUI opens enabling the
+    % Include optional step in which a GUI opens enabling the
         % manually adjustment of the binary mask of your foreground segmentation.  
         % I incorporated this because sometimes an image has rip, tear, 
         % or some other quirk which hinder registration. By dragging the mask to approximately
         % the shape of the tissue without a rip, registration works much better.
-        reg_manPtRepositioning = false;
+        reg_manPtRepositioning = true;
 
     % scale factor #2. If you downsampled images before segmentation and did not upsample
       % before saving, then likely you don't need any resampling here 
       % (in this event, indicate no resampling by setting this = 1.0)
         reg_scaleFactor2 = 1.4; 
-    
+     
     % Set how many control points we assign to each of the 4 side of each tissue! 
          % (In total we will have this:
          %               numel(controlPoints) = 9 + 4*reg_numCPointsPerSide)
-        reg_numCPointsPerSide = 22;
+        reg_numCPointsPerSide = 22; % In my experience between 12 and 30 works best 
 
  % ======================================================================= %  
  
  % Choosing ROIs --
 
     % How many ROIs to pick out?
-        roi_numROIs = 4;
+        roi_numROIs = 8;
 
     % Size of each ROI's? Provide the dimensions in pixels, as a vector: [height, width]
         % Do not indicate an roi_size adjusted for any resampling, that will happen automatically,
         % instead the dimensions should reference the pixel grid of your RAW input image.
-        roi_sizeROI = [450,350];
+        roi_sizeROI = [650, 650];
 
     % Sampling method- I have included two procedures for the spatial sampling of the
     % whole slide image. 
@@ -138,7 +149,7 @@ doNOTloopThroughDirectory_justUseThis = false;
     % 360deg of rotation. 
     % rotation
         roi_YesRotation = true; % this applies to either of the 2 methods. 
-            %^^ NOTE: rotation requires interpolation, which can lead to spurrious signals and affect
+            %^^ NOTE: rotation requires interpolation, which can lead to spurious signals and ffect
             %invariant feature calculations. Use with caution.
 
     % [optional: CirclePacking only] Override the preset range of radii for the Circle Packing algorithm? 
@@ -163,20 +174,34 @@ doNOTloopThroughDirectory_justUseThis = false;
 
 % =========== #1 fileDirectories ========================================= %
 
-fileDirectories = struct('rawData', directOfImages,...
-                         'saveSegm_adjImages', saveSegm_adjImages,...
-                         'saveSegm_foregroundMask', saveSegm_foregroundMask, ...
-                         'saveRegistraion', saveRegistraion,...
-                         'saveDestination_rois', saveDestination_rois);
+if makeSaveDir_yn || strcmp(directOfImages ,saveSegm_adjImages) || strcmp(directOfImages ,saveSegm_foregroundMask) || strcmp(directOfImages ,saveRegistraion) || strcmp(directOfImages ,saveDestination_rois)
 
-% ensures that each path in this array has a terminal '/'
+    % checks if one already exists first....
+    if ~exist(fullfile(directOfImages, filesep, 'savedOutput'), 'file')
+        mkdir(fullfile(directOfImages, filesep, 'savedOutput'));
+    end
+    savePath = fullfile(directOfImages, filesep, 'savedOutput');
+    fileDirectories = struct('rawData', directOfImages,...
+        'saveSegm_adjImages', savePath,...
+        'saveSegm_foregroundMask', savePath, ...
+        'saveRegistraion', savePath,...
+        'saveDestination_rois', savePath);
+else
+    fileDirectories = struct('rawData', directOfImages,...
+        'saveSegm_adjImages', saveSegm_adjImages,...
+        'saveSegm_foregroundMask', saveSegm_foregroundMask, ...
+        'saveRegistraion', saveRegistraion,...
+        'saveDestination_rois', saveDestination_rois);
+end
+
+% ensures that each path in this array has a terminal '/' 
 fileDirectories = structfun(@(x) strcat(x, '/'), fileDirectories, 'UniformOutput', false);
 fileDirectories = structfun(@(x) replace(x, '//', '/'), fileDirectories, 'UniformOutput', false);
 
 
 % =========== #2 fileFORMATS ============================================= %
 
-fileFMTS = struct(  'rawDataFMT', [],...
+fileFMTS  =  struct('rawDataFMT', {input_rawdata_format},...
                     'segm_saveFMT_adjImage', segm_saveFMT_adjImage, ...
                     'segm_saveFMT_foregroundMask', segm_saveFMT_foregroundMask,...
                     'reg_saveFMT_adjImage', reg_saveFMT_adjImage,...
@@ -184,22 +209,12 @@ fileFMTS = struct(  'rawDataFMT', [],...
                     'chooseROI_saveFMT_allROIs', chooseROI_saveFMT_allROIs,...
                     'chooseROIS_saveFMT_roiLocations', chooseROIS_saveFMT_roiLocations);
 
-fileFMTS(1).rawDataFMT = input_rawdata_format; 
-% This variable is set off on its own down here so to preempt a sneaky and pernicious 
-% pitfall of setting structural array fields to char arays.... Consider this example: 
-    %           s = struct('rawDataFMT', {'.ext1', '.ext2'},...) 
-    % however much you may want this to be interpretted as: 
-    %           s(1).files = {'.ext1', '.ext2'}. 
-    % as written, it means:
-    %           s(1).files = '.ext1'; 
-    %           s(2).files = '.ext2'; 
-
 
 % =========== #3 pickME (specific sample choices) ======================== %
 
    pickME = struct('sampleID', [],'stainID', []);
 
-if doNOTloopThroughDirectory_justUseThis
+if doNOTloopThroughDirectory_justUseID
    pickME = struct('sampleID', sampleID, 'stainID', stainID);
 end
 

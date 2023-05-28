@@ -24,7 +24,6 @@ mySettings = setts_and_prefs;
 data = parseDataset(mySettings, 'choosingROIs'); 
 
 
-
 if contains(mySettings.chooseROI.roi_method, 'random', 'IgnoreCase',true)
     
     savePath = mySettings.directories.saveDestination_rois;
@@ -35,10 +34,14 @@ if contains(mySettings.chooseROI.roi_method, 'random', 'IgnoreCase',true)
     
     for nFile = 1:size(data.rgbIMDS.Files,1)
         %% run the script
-        [all_roi_masks, array_of_individual_masks, array_of_ROIs] = userOnLoop_ROIselection(nFile);
+  
+        [all_roi_masks, extractedROIs] = userOnLoop_ROIselection(nFile);
         disp(strcat('done processing :',data.rgbNames(nFile, 1), ' beginning to save!'));
 
         %% save!!!
+        array_individBinaryMasks = extractedROIs(nFile).binary;
+        array_of_rgbROIs = extractedROIs(nFile).binary;
+
         % 1. Binary image that is the composite of all mask locations
         filename = strcat('All_ROImasks_', data.maskNames(nFile, 1), mySettings.fileFormats.chooseROIS_saveFMT_roiLocations);
         filepath_all = fullfile(savePath, filesep, filename);
@@ -51,11 +54,11 @@ if contains(mySettings.chooseROI.roi_method, 'random', 'IgnoreCase',true)
         filepath_rois = fullfile(savePath, filesep, filename_rois);
         for im  = 1:mySettings.chooseROI.numROIs
             if im == 1
-                imwrite(array_of_individual_masks{im}, char(filepath_individ), 'WriteMode', 'overwrite');
-                imwrite(array_of_ROIs{im}, char(filepath_rois), 'WriteMode', 'overwrite', 'Compression', 'none');
+                imwrite(array_individBinaryMasks{im}, char(filepath_individ), 'WriteMode', 'overwrite');
+                imwrite(array_of_rgbROIs{im}, char(filepath_rois), 'WriteMode', 'overwrite', 'Compression', 'none');
             else
-                imwrite(array_of_individual_masks{im}, char(filepath_individ), 'WriteMode', 'append');
-                imwrite(array_of_ROIs{im}, char(filepath_rois), 'WriteMode', 'append', 'Compression', 'none');
+                imwrite(array_individBinaryMasks{im}, char(filepath_individ), 'WriteMode', 'append');
+                imwrite(array_of_rgbROIs{im}, char(filepath_rois), 'WriteMode', 'append', 'Compression', 'none');
             end
         end
         disp(strcat('done saving :',data.rgbNames(nFile, 1) ));

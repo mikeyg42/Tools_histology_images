@@ -25,6 +25,7 @@ lab = rgb2lab(RGBim);
 lscaled = rescale(lab(:,:,1), 0, 1);
 lCh = imcomplement(lscaled);
 
+% base the size of the kernel on the rough size of the image
 if max(size(lCh, 1:2))> 6000
     se = strel('disk', 21, 8);
 else
@@ -52,12 +53,12 @@ ps = polyshape(conX, conY, 'Simplify', true);
 
 %buffer the edges a bit to smoothen some jagged edges caused by the fat SE.
 % then, remake your mask
-ps2 = polybuffer(ps.Vertices, 'points', bufferAmount);
+ps2 = polybuffer(ps, bufferAmount);
 bufferedMask = poly2mask(ps2.Vertices(:, 1), ps2.Vertices(:, 2), size(RGBim, 1), size(RGBim, 2));
-[gx, gy] = derivative5(lscaled, 'x', 'y');
-target = imcomplement(hypot(gx, gy));
 
-%remove your padding of edges with 30 or so iterations of active contour
-BinMask = activecontour(target, bufferedMask, 32);
+%remove your padding of edges with 25 iterations of active contour
+[gx, gy] = derivative7(lscaled, 'x', 'y');
+target = imcomplement(hypot(gx, gy));
+BinMask = activecontour(target, bufferedMask, 21);
 end
 

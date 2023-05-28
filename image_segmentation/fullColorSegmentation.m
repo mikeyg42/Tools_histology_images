@@ -10,6 +10,7 @@ function [BWmask, BWedge] = fullColorSegmentation(rawRGBim)
 % derivative of this deltaE image, using Peter Kovesi's funciton for the 7-tap estimate of
 % image partial derivaties. We apply local contrasting via IMLOCALBRIGHTEN to the magnitude of the
 % second derivattive gradient.
+
 % After this, we use image reconstruction to enhance our 1st derivative image with the
 % enhanced edges of the second derivative. After this, using the morphological function
 % IMIMNPOSEMIN applied to this enhanced image achieves an image very amenable to
@@ -36,7 +37,7 @@ dE = rescale(sqrt(highpassfilt{1}.^2 + highpassfilt{2}.^2 + highpassfilt{3}.^2),
 edge_mag = hypot(ex, ey);
 contrast_edgeMag = imlocalbrighten(rescale(edge_mag, 0, 1));
 
-%morphological reconstructio of the 1st deriv with the 2nd deriv
+%morphological reconstruction of the 1st deriv with the 2nd deriv
 highCon = imreconstruct(contrast_edgeMag, dE) ;
 
 % Using the mean of the image as basis for unsupervised im processing 
@@ -44,7 +45,7 @@ id_mean = find(round(highCon, 4) == round(mean(highCon(:)),4));
 meanPoints = zeros(size(highCon, 1:2), 'single');
 meanPoints(id_mean) = 1;
 
-% morphological imimposemin!! then unsupervised thresholding using the image mode which
+% morphological imimposemin! then unsupervised thresholding using the image mode which
 % will be the background usually! 
 flatim = imimposemin(imcomplement(highCon), meanPoints);
 noPadding = flatim(10:end-9, 10:end-9); %remove padding

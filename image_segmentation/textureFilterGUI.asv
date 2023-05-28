@@ -82,11 +82,11 @@ chls = {ImR, ImG, ImB};
 bwIms = cellfun(@(x) fastMarchingEntropyFilter(x),chls, 'UniformOutput', false);
 [BW2a, successYN] = smartCombineChannels(bwIms);
 
-if successYN 
+if successYN == 1
     BW2 = BW2a;
-else
-    BW2a = fastMarchingEntropyFilter(rgb2gray(imgIn));
-    BW2 = padarray(BW2a, [7, 7], 'replicate', 'both');
+elseif successYN == 0
+    BW2 = fastMarchingEntropyFilter(rgb2gray(imgIn));
+    BW2 = padarray(BW2, [7, 7], 'replicate', 'both');
 end
 
 %------- BW3, 4, 5-----------------------
@@ -158,7 +158,7 @@ BW7 = cleanMask(BW7);
 
 %% PART 2: images are made = time to select the winners and combine their wisdom
 %
-ImList = {BW1, BW2, BW3, BW4, BW5, BW6, BW7};
+ImList = {imgC, BW1, BW2, BW3, BW4, BW5, BW6, BW7};
 ImListpad = cellfun(@(x) padarray(x, [25, 25], 1),ImList, 'UniformOutput', false);
 out = imtile(ImListpad, 'GridSize', [3, 3], 'BorderSize', 25);
 
@@ -173,7 +173,7 @@ ax = uiaxes(gl3_images);
 ax.GridLineStyle = 'none';
 disableDefaultInteractivity(ax);
 
-pb1= uibutton(gl3_images,'Text', 'Once the best few options are checked, click here to combine them and proceede',...
+pb1= uibutton(gl3_images,'Text', 'Confirm all good masks are checked, so we can move on',...
     'ButtonPushedFcn',@buttonCallback);
 
 gl2_buttons = uigridlayout(bg, [3, 3]);
@@ -213,7 +213,7 @@ close all force
 
 selectedImages = cell2mat(checkboxValues);
 bestIms = ImList(selectedImages);
-andImage = double(bestIms{1}); %initialize with the first bestIm (specifying double so they add)
+andImage = double(bestIms{1});
 nIms = numel(bestIms);
 for pp = 2:nIms
     andImage = andImage+double(bestIms{pp});
@@ -222,17 +222,15 @@ end
 andImage(andImage<nIms)=0;
 andImage(andImage==nIms)=1;
 andImage = logical(andImage);
-
-cc = bwconncomp(andImage, 8);
-sz = cellfun('prodofsize', cc.PixelIdxList)>400;
-nRegions = numel(find(sz));
+gg = regionprops('table', andImage, 'MajorAxisLength');
+nRegions = sum(gg.MajorAxisLength>200);
 finalMask = bwareafilt(andImage, nRegions);
 finalMask = finalMask(8:end-7, 8:end-7);
-
 warning('on','MATLAB:polyshape:repairedBySimplify');
 end
 
 function buttonCallback(~, ~)
+
 uiresume;
 end
 
@@ -317,7 +315,7 @@ img2 = rescale(imadd(imadd(a,b), c), 0, 1);
 end
 
 
-function [BWimage, flag] = smartCombineChannels(cellArray3Ims) 
+function [BW, successYN] = smartCombineChannels(cellArray3Ims) 
 
 % define a range of percentages between which each image fills the page
 area100 = prod(size(cellArray3Ims{1}, 1:2));
@@ -326,27 +324,24 @@ areaVals = cellfun(@(x) bwarea(x), cellArray3Ims, 'UniformOutput', true);
 
 % index only those values within range
 idx = areaVals<rangeA(1) & areaVals>rangeA(2);
-successsYN = 1;
 
 switch sum(idx)
     case 0
-        BWimage = zeros(size(cellArray3Ims{1}));
+        BW = zeros(size(cellArray3Ims{1}));
         successsYN = 0;
-        
-    case 1    
-        BWimage = cellArray3Ims{idx};
-        
+    case 1
+        successsYN = 1;
+        BW = cellArray3Ims{idx};
     case 2 
+        successsYN = 1;
         ix = find(idx);
-        BWimage = immultiply(cellArray3Ims{ix(1)}, cellArray3Ims{ix(2)}); %elementwise  multiplication
-
+        BW = immultiply(cellArray3Ims{ix(1)}, cellArray3Ims{ix(2)}); %elementwise  multiplication
     case 3
-        BWimage = cellArray3Ims{1} & cellArray3Ims{2} & cellArray3Ims{3};
-
+        successsYN = 1;
+        BW = cellArray3Ims{1} & cellArray3Ims{2} & cellArray3Ims{3};
     otherwise
         error('the ostensibly simple smartCombineChannels function is totally whack? this should not be possible!!!')
 end
-
-flag = logical(successsYN); 
+successsYN = logical(successsYN); %#ok<NOPRT>
 
 end

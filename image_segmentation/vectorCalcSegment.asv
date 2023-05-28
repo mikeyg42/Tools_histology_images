@@ -61,14 +61,11 @@ SGDG = ordfilt2((dxx.*dx.^2+dyy.*dy.^2+2.*dxy.*dx.*dy)./(dx.^2+dy.^2), 9, ones(3
 % use morphological reconstruction to prioritize edges in areas with high variance
 edgeMap = imreconstruct(edge(imclose(rescale(imadjust(SGDG), 0,1), strel(ones(3))), 'Sobel'), imbinarize(lVarMap , T(3)));
 im3 = bwmorph(bwareafilt(edgeMap, 1), 'thin');
-if checkImfill(im3)
-    im3 = imfill(im3, 'holes');
-    if bwarea(im3)<0.5*prod(size(im3, 1:2))
-        [y, x] = find(bwskel(im3));
-        cent = round(sum([x, y], 1)./length(x));
-        im3 = grayconnected( im2double(im3),cent(1), cent(2), 0.5);
+    if checkImfill(im3)
+        im3 = imfill(im3, 'holes');
     end
-end
+if bwarea(im3)<0.5*prod(size(im3, 1:2))
+    
 
 %% LOW-order fractional deriv (v = 0.6)
 fractDeriv1 = imFractionDeriv(grayIm, 0.6);
@@ -84,7 +81,7 @@ im2 = imbinarize(fDeriv2, T2);
 
 %% Classic, built-in IPT gradient image (1st order)
 [gx, gy] = imgradientxy(imlocalbrighten(grayIm));
-gmag = medfilt2(hypot(gx, gy), [5,5]);
+gmag = medfilt2(hypot(gx, gy));
 im4 = imbinarize(gmag, graythresh(gmag)*0.95);
 im4 = bwareafilt(im4,1);
 if checkImfill(im4)

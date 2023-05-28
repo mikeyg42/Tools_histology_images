@@ -13,7 +13,7 @@ close all force
 listMethods = {'DONE',...
     'Simple thresholding, plus some gentle cleaning',...
     'Color segment w/ graydiffweight',...
-    'Partial + fractional derivatives',...
+    'Segment with various vector calc tools',...
     'Full color segmentation',...
     'Double threshold (hysteresis)',...
     'Color segment with geodesics, w/ provided foreground sample',...
@@ -86,8 +86,8 @@ while true
             imshow(imAdjRGB,'Parent',axy2, 'Border', 'tight');
 
             visboundaries(axy2, outOfBoundsMask_old, 'Color', 'r');
-            visboundaries(axy2, binaryMask, 'Color', 'b');
-
+            hold on            hold off
+            
             fig2.Visible = 'on';
             drawnow;
         end
@@ -103,7 +103,8 @@ while true
         axy3 = axes(fig3);
         
         imshow(imAdjRGB,'Parent',axy3, 'Border', 'tight');
-        visboundaries(axy3, binaryMask, 'Color', 'r');
+        hold on
+        visboundaries(axy3, binaryMask, 'Color', 'r'); hold off
     end
 end
 
@@ -146,14 +147,17 @@ switch choice
         outOfBoundsMask = cleanMask(outOfBoundsMask);
     
     case 'Full color segmentation'
-        imgC = imresize(imgCurrent, 0.5, {@oscResampling, 4});
-        [BWmask, ~] = fullColorSegmentation(imgC);
-        outOfBoundsMask = imresize(BWmask, size(imgCurrent, 1:2), {@oscResampling, 4});
+        imgCurrent = imresize(imgCurrent, 0.5, {@oscResampling, 4});
+        [BWmask, ~] = fullColorSegmentation(imgCurrent);
+        BWmask = imresize(BWmask, 2, {@oscResampling, 4});
     
-    case 'Partial + fractional derivatives segmentation'
-        outOfBoundsMask = vectorCalcSegment(imgCurrent);
+    case 'Segment with various vector calc tools'
+        myIm_resized = imresize(imgCurrent, round(5000/max(size(imgCurrent, 1:2)), 3) , {@oscResampling, 4} );
+        outOfBoundsMask = vectorCalcSegment(myIm_resized);
+        outOfBoundsMask = imresize(outOfBoundsMask, size(imgCurrent, 1:2) , {@oscResampling, 4});
 
     case 'Color segment w/ graydiffweight' 
+        
         outOfBoundsMask = weightingPixelIntensityDiffs_RGBseg(imgCurrent);
          
     case 'refine : dilate mask'
@@ -175,13 +179,12 @@ switch choice
     case 'Texture segmentation options GUI (no Gabor)' 
         rescaleFactor = 2000/max(size(imgCurrent, 1:2));
         imgRGB = imresize(imgCurrent,rescaleFactor, {@oscResampling,4}); %gets resized after the switch-case block 
-        %imgGray = rgb2gray(imgRGB);
-        outOfBoundsMask = textureFilterGUI(imgRGB); 
+        imgGray = rgb2gray(imgRGB);
+        outOfBoundsMask = textureFilterGUI(imgGray); 
         outOfBoundsMask = imresize(outOfBoundsMask, size(imgCurrent, 1:2),{@oscResampling,4});
         
     case 'Color segment with geodesics, w/ provided foreground sample'
         outOfBoundsMask = geoProbSeg_2tone(imgCurrent);
-        assert(islogical(outOfBoundsMask));
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'k means color clustering segmentation' 
@@ -240,15 +243,16 @@ end %end improcessing function. returns now to parent function workspace (@final
 
 
 
-function guiCloseFuntion(src,evt)
+function guiCloseFuntion(src, evt)
 % guiCloseFuntion(src, evt, varargin)
 % 
 % This is a callback function for the GUIs to prevent bugs associated with inadvertent
 % closing of GUIs and/or mis-selection of a particular choice. 
+
 mymessage = sprintf(['<html> <font size="5"]><b>Are your sure you would like to close right now? without saving?!</b></font<br><br>' ...
 '<font size="3">You can save by selecting <font color="blue"><i>DONE</i></font> or <font color="blue"><i>NOT DONE</i></font> on the list to initiate this. </font></html>']);  
 
-confirmation = uiconfirm(fHandle, mymessage,'Confirm Close',...
+confirmation = uiconfirm(gcf, mymessage,'Confirm Close',...
     'Options', {'Yes, get me out of here, no saving', 'No, Ive changed my mind'},...
     'DefaultOption', 'No, Ive changed my mind',...
     'Icon', 'warning' ,...

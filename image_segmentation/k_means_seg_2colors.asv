@@ -30,9 +30,9 @@ chl1 = im2single(ab1)     ; chl2 = im2single(ab2)   ;
 
 if ceil(mean(chl1(2:5,2:5), 'all'))==1 %check in the top left corner and see if its more or less white or black. flip if white
     chl1 = imcomplement(chl1); end
-if ceil(mean(chl2(2:5,2:5), 'all'))==1
-    chl2 = imcomplement(chl2); end
-
+if ceil(m= imcomplement(chl2); end
+ean(chl2(2:5,2:5), 'all'))==1
+    chl2 
 if texture_y_n
     Eim = im2single(entropyfilt(imgCurrent));
     Sim = im2single(stdfilt(imgCurrent,ones(9)));

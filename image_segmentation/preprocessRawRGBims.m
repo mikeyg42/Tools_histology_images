@@ -18,5 +18,5 @@ newSize = ceil([sz(1), sz(2)].*scaleFactor);
 myImage = imresize(myImage, newSize,{@oscResampling, 4}); %downsampling
 end
 
-imAdjRGB = evenFasterCorrect(myImage); %removing background and mosaic artifacts with tophat filter
+imAdjRGB = evenFasterCorrection(myImage); %removing background and mosaic artifacts with tophat filter
 end

@@ -17,17 +17,17 @@ function [mySettings] = setts_and_prefs
  % ====================== FILE PATHS ===================================== %  
 % INPUT: 
         % Path to where all of your images are stored:
-directOfImages          = '/Users/mikeglendinning/Desktop/processedMSimages/';
+directOfImages          = '/Users/mikeglendinning/Desktop/tiled images as tiffs/';
 
 % OUTPUT
         % option 1. Specify file path to where output is saved:
-saveSegm_adjImages      = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput'; 
-saveSegm_foregroundMask = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
-saveRegistraion         = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
-saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/saveOutput';
+saveSegm_adjImages      = '/Users/mikeglendinning/Desktop/processedMSimages/'; 
+saveSegm_foregroundMask = '/Users/mikeglendinning/Desktop/processedMSimages/';
+saveRegistraion         = '/Users/mikeglendinning/Desktop/processedMSimages/';
+saveDestination_rois    = '/Users/mikeglendinning/Desktop/processedMSimages/';
         % option 2. leave these blank/ignore the above and we will just make a new directory
         % within the input folder. (Change to FALSE if you want to specify a precise path)
-makeSaveDir_yn          = true; % <-- a value of TRUE takes priority over any path specified above
+makeSaveDir_yn          = false; % <-- a value of TRUE takes priority over any path specified above
 
 % ^ NOTE: if any of the 4 save paths are the SAME as directOfImages, then a new
 % save directory will be made regardless. This is because the code will get confused after
@@ -61,13 +61,13 @@ makeSaveDir_yn          = true; % <-- a value of TRUE takes priority over any pa
 % the specific sample you'd like to process: sample ID and stain ID(s)
 % - Ensure that there are not multiple files with the same identifiers indicated
 
-doNOTloopThroughDirectory_justUseID = false; 
+doNOTloopThroughDirectory_justUseID = true; 
 % This works for ChoosingROIs and Segmentation. 
 
   %1.
-     sampleID      = '4817'; % =========================================== %
+     sampleID      = 'F'; % =========================================== %
   %2.
-     stainID       = 'cd31'; % =========================================== %
+     stainID       = 'CD31'; % =========================================== %
   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -77,9 +77,9 @@ doNOTloopThroughDirectory_justUseID = false;
 % Segmentation -- %note that in the .m file for 
 
     % a 1.25GB image takes ~1-2mins after it has been scaled down 2.8
-        seg_scaleFactor = 2.7;
+        seg_scaleFactor = 3;
 
-    % save scaled downimage? or try to resample image back to original size before save?
+    % save scaled downimage? alternative is to try to resample image back to original size before save?
         seg_resizeBig = false;
     
     % after you have processed a raw file, the adjusted image will be saved. 
@@ -88,10 +88,10 @@ doNOTloopThroughDirectory_justUseID = false;
     
     % in the event that one file in your rawdata directory has a mask already in the save
     % folder, do you want to double check it or just skip?
-        seg_doubleCheckSavedMasks = true;
+        seg_doubleCheckSavedMasks = false;
     
     % optional - include a prefix identifier for saved files. It must start with an underscore!
-         seg_versionID = '_v1';  %can also be left blank with char() 
+         seg_versionID = '_v3';  %can also be left blank with char() 
 
         
  % ======================================================================= %  
@@ -133,7 +133,7 @@ doNOTloopThroughDirectory_justUseID = false;
     % Size of each ROI's? Provide the dimensions in pixels, as a vector: [height, width]
         % Do not indicate an roi_size adjusted for any resampling, that will happen automatically,
         % instead the dimensions should reference the pixel grid of your RAW input image.
-        roi_sizeROI = [650, 650];
+        roi_sizeROI = [600, 600];
 
     % Sampling method- I have included two procedures for the spatial sampling of the
     % whole slide image. 

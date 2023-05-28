@@ -41,7 +41,7 @@ contrast_edgeMag = imlocalbrighten(rescale(edge_mag, 0, 1));
 highCon = imreconstruct(contrast_edgeMag, dE) ;
 
 % Using the mean of the image as basis for unsupervised im processing 
-id_mean = find(round(highCon, 4) == round(mean(highCon(:)),4));
+id_mean = round(highCon, 4) == round(mean(highCon(:)),4);
 meanPoints = zeros(size(highCon, 1:2), 'single');
 meanPoints(id_mean) = 1;
 
@@ -52,7 +52,7 @@ noPadding = flatim(10:end-9, 10:end-9); %remove padding
 BWmaskp = noPadding > mode(noPadding(:))*1.01;
 BWmaskp = bwareaopen(BWmaskp, 120);
 
-BWmask_sing = activecontour(rawRGBim, BWmaskp, 12, 'Chan-Vese');
+BWmask_sing = activecontour(rawRGBim, BWmaskp, 15, 'Chan-Vese');
 
 BWmask= im2double(BWmask_sing);
 

@@ -15,9 +15,9 @@ switch SCRIPT
 
         %% OPT 1 -  we make the datastore containing specific images specified
         % if these fields are empty then we know that it was indicated in settings to process whole directory
-        if ~isempty(mysettings_prefs.pickME.sampleID) && ~isempty(mysettings_prefs.pickME.stain1)
+        if ~isempty(mysettings_prefs.pickME.sampleID) && ~isempty(mysettings_prefs.pickME.stainID)
             sampleID = mysettings_prefs.pickME.sampleID;
-            stainID = mysettings_prefs.pickME.stain1;
+            stainID = mysettings_prefs.pickME.stainID;
 
             % Loop over file extensions and add matches to Fnames
             Fnames = cell(1, numel(rawDataFormat));  % Initialize
@@ -28,7 +28,7 @@ switch SCRIPT
             Fnames = [Fnames{:}];
 
             %look for the files with names that match your Identifiers sample stain
-            fIdx = contains(Fnames, sampleID,'IgnoreCase',true) & contains(Fnames, stainID,'IgnoreCase',true);
+            fIdx = contains(extractBefore(Fnames,'.'), sampleID,'IgnoreCase',true) & contains(extractBefore(Fnames,'.'), stainID,'IgnoreCase',true);
 
             if sum(fIdx)==0
                 error(strcat('There is no file in this directory that shares the sampleID (', sampleID,'), stainID (', stainID,'), versionID and extension indicated'));
@@ -36,7 +36,7 @@ switch SCRIPT
                 error(strcat('More than 1 image has been found within the raw data folder sharing the sampleID (', sampleID,'), stainID (', stainID,'), versionID, and extension you have indicated.'));
             end
 
-            fileName = Fnames{find(fIdx)};
+            fileName = Fnames{fIdx};
             data.imageDS = imageDatastore(fullfile(rawDataLocation, fileName));
             data.imageNames = data.imageDS.Files{1};
         else
@@ -58,11 +58,28 @@ switch SCRIPT
             % get rid of any underscores
             versionID = setdiff(mysettings_prefs.savePrefs.seg_versionID, '_', 'stable');
         end
+        
+        if class(data.imageNames) == 'char'
+            nFiles = 1;
+            data.imageNames = {data.imageNames};
+        else
+            nFiles = numel(data.imageNames);
+        end
 
-        for k = 1:numel(fileList)
+        for k = 1:nFiles
 
             % search for each part of filename within save_fL1 and save_fL2
             searchterms =  split(data.imageNames(k), '_');
+            
+            % fix the first term which will have the whole path
+            extraSearchParts1 = split(searchterms{1}, '/');
+            searchterms{1} = extraSearchParts1{numel(extraSearchParts1)};
+            
+            % fix the final term which will have the esxtension
+            extraSearchParts2 = split(searchterms{3}, '.');
+            searchterms{3} = extraSearchParts2{1};
+            
+            % This should just be sample ID, stain ID, and group ID, nothing else
             myquery = {searchterms{1}, searchterms{2}, searchterms{3}};
             if ~vID
                 matches1 = cellfun(@(x) contains(save_fL1', x,'IgnoreCase',true), myquery , 'UniformOutput', false);
@@ -98,6 +115,8 @@ switch SCRIPT
             elseif sum(combinedArray1) > 0 && sum(combinedArray2) > 0
                 data.segInfo(k).needAdjRGB = false;
                 data.segInfo(k).needMask = false;
+            else
+                error('nothing found at end of parser')
             end
         end
 
@@ -135,10 +154,10 @@ switch SCRIPT
                     end
                 end
                 versionNumbers2 = zeros(numel(maskIms.name), 1, 'double');
-                for k = 1:numel(maskIms.name)
-                    match2 = regexp(maskIms.name(k), pattern, 'tokens', 'once');
+                for b = 1:numel(maskIms.name)
+                    match2 = regexp(maskIms.name(b), pattern, 'tokens', 'once');
                     if ~isempty(match2)
-                        versionNumbers2(k, 1) = str2double(match2{1});
+                        versionNumbers2(b, 1) = str2double(match2{1});
                     end
                 end
 
@@ -216,7 +235,7 @@ switch SCRIPT
                     elseif numel(maskFilenames) > 1
                         matchesIMDS =imageDatastore(fullfile(mysettings_prefs.directories.saveSegm_foregroundMask, maskIm_matches.name));
                         matches = readall(matchesIMDS);
-                        findVersionNum = regexp(matchesIMDS.Files(k), pattern, 'tokens', 'once');
+                        findVersionNum = regexp(matchesIMDS.Files(p), pattern, 'tokens', 'once');
                         maxVersionNum = find(findVersionNum== max(findVersionNum));
                         if numel(maxVersionNum)== 1
                             maskFilenames{p} = matchesIMDS.Files{maxVersionNum};

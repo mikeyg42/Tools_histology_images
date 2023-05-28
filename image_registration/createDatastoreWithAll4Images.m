@@ -7,8 +7,8 @@ LIST = LIST(:,1);
 adjustedImages = LIST(contains(LIST, 'tiff'));
 binaryMasks = LIST(contains(LIST, 'png'));
 
-numIdx_ims = contains(adjustedImages, ID);
-numIdx_masks = contains(binaryMasks, ID);
+numIdx_ims = contains(adjustedImages, strcat('_',ID, '_'));
+numIdx_masks = contains(binaryMasks, strcat('_',ID, '_'));
 
 stain1_Idx_ims = contains(adjustedImages, Stain1_fixed);
 stain1_Idx_masks = contains(binaryMasks, Stain1_fixed);

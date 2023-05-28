@@ -47,18 +47,22 @@ elseif nargin > 1
     end
 end
 
+if ~islogical(mymask)
+    mymask = logical(mymask);
+end
+
 % evaluate the largest blob
 largest1blobIm = bwareafilt(mymask, 1);
-area = sum(largest1blobIm, 'all');
+area = bwarea(largest1blobIm);
 
 % If the largest blob is smaller than minSize value, final result will be "overcleaned"!!
 if minSize > area
     myCleanMask = mymask;
-    disp('could not clean mask because no blob was larger than minSize... mask returned as is');
+    disp('no blob was larger than minSize... cleanMask operation not performed and mask is returned untouched');
     return;
 end
 % Filter all blobs except those with areas between minSize and +infinity 
-mymask = bwareafilt(mymask, [minSize, Inf]);
+mymask = bwareafilt(mymask, [minSize, +Inf]);
 
 % dilate the largest blob with a structural element the size of minDist
 SE_radius = strel('disk', minDist,8) ;

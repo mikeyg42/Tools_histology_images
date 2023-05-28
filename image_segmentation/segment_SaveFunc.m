@@ -9,7 +9,10 @@ function segment_SaveFunc(mySettings, info, finalbinaryMask, imAdjRGB)
 %/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%
 %--%--\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/<--%->/^*^\<--%--->\v.v/
 
-    activeFilename = mySettings.activeFilename;
+    Filename = split(mySettings.activeFilename, '/');
+    activeFilename_wExt = split(Filename{end}, '.');
+    activeFilename = activeFilename_wExt{1};
+
 
     mask_FMT = mySettings.fileFormats.segm_saveFMT_adjImage;
     RGB_FMT = mySettings.fileFormats.segm_saveFMT_foregroundMask;

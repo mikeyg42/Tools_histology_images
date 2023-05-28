@@ -31,34 +31,60 @@ function registerSerialSections_part1
 
 % change these variable assignments! 
 %  ||    ||
-%  vv    vv     directorytosaveinto should be where you have your 
+%  vv    vv     directorytosaveinto should be where you have your
 % ======================================================================================== %
-directorywithimagefiles = '/Users/jglendin/Desktop/tiled_images_as_tiffs/';  %
-destinationToSaveInto = '/Users/jglendin/Dropbox/Dropbox - Michael/processedMSimages';%
-ID = 'A'; %===========================================================================  % 
+directorywithimagefiles = '/Users/mikeglendinning/Desktop/processedMSimages/';  %
+destinationToSaveInto = '/Users/mikeglendinning/Desktop/processedMSimages/savedOutput_reg/';%
+ID = 'F'; %===========================================================================  %
 Stain1_fixed = 'CD31'; %=================================================================  %
 Stain2_moving = 'MCAM'; %=================================================================  %
 % =======================================================================================  %
-               
-                %% ...THE GAME IS AFOOT %%
-    
-%% Part 0. Preprocessing steps 
+
+%% ...THE GAME IS AFOOT %%
+
+%% Part 0. Preprocessing steps
 
 
-%% preprocessing step 1. Load the image files 
+%% preprocessing step 1. Load the image files
 % We need to load into the workspace the two images we will register. We
-% also need masks delineating background/foreground. 
+% also need masks delineating background/foreground.
 imDS = createDatastoreWithAll4Images(directorywithimagefiles, ID, Stain1_fixed, Stain2_moving);
 myimages = cellfun(@(X)imresize(X, 0.5,{@oscResampling, 4}), readall(imDS), 'UniformOutput', false);
 
 % ref_IMG will be also called "FIXED" to remind us to not perform any spatial transformations
-ref_IMGadj = ensureDoubleScaled(myimages{2},true);
-ref_IMGmask = logical(myimages{1});
+if ndims(myimages{2}) == 3
+    ref_IMGadj = im2double(myimages{2});
+    sz1 = size(ref_IMGadj, 1:2);
+    ref_IMGmask = logical(myimages{1});
+    if size(ref_IMGmask,1) ~= sz1(1)
+        ref_IMGmask = imresize(ref_IMGmask, sz1, {@oscResampling, 4});
+    end
+else
+    ref_IMGadj = im2double(myimages{1});
+    sz1 = size(ref_IMGadj, 1:2);
+    ref_IMGmask = logical(myimages{2});
+    if size(ref_IMGmask,1) ~= sz1(1)
+        ref_IMGmask = imresize(ref_IMGmask, sz1, {@oscResampling, 4});
+    end
 
-% MOVING also be called "MOVING" because that is what we will
-% morpho, maintaining the integrity of the stain we will later quantify
-MOVING_pre = ensureDoubleScaled(myimages{4},true);
-MOVINGmask_pre = logical(myimages{3});
+    % MOVING also be called "MOVING" because that is what we will
+    % morpho, maintaining the integrity of the stain we will later quantify
+    if ndims(myimages{4}) == 3
+        MOVING_pre = im2double(myimages{4});
+        sz3 = size(MOVING_pre, 1:2);
+        MOVINGmask_pre = logical(myimages{3});
+        if size(MOVINGmask_pre,1) ~= sz3(1)
+            MOVINGmask_pre = imresize(MOVINGmask_pre, sz3, {@oscResampling, 4});
+        end
+    else
+        MOVING_pre = im2double(myimages{3});
+        sz3 = size(MOVING_pre, 1:2);
+        MOVINGmask_pre = logical(myimages{4});
+        if size(MOVINGmask_pre,1) ~= sz3(1)
+            MOVINGmask_pre = imresize(MOVINGmask_pre, sz3, {@oscResampling, 4});
+        end
+    end
+
 clear myimages
 
 

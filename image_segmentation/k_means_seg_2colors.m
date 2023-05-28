@@ -1,63 +1,46 @@
-function outMask = k_means_seg_2colors(imgCurrent,varargin)
-% outOfBoundsMask = k_means_seg_wrapperFcn(imgCurrent, [y/n to incl textures])
+function finalOutMask = k_means_seg_2colors(imgCurrent)
+% outOfBoundsMask = k_means_seg_wrapperFcn(imgCurrent)
 % This calls the image processing toolbox function IMSEGKMEANS,(a 
 % segmentation method based on the k-means algorithm. It uses for this
-% segmentation the *a and *b channels of the L*a*b colorspace (which
-% contain the images color information, sans luminence.
-
-% If 1 or true is included as an input to this function, then some
-% additional channels are appended to this image stack, making use of the
-% IMSEGKMEANS useful abiliity to handle any amount of channels, given that
-% more information is only going to faciltate segmentaion. It uses STDFILT,
-% which is the local standard deviation in a 9x9 nhood, and ENTROPYfilt,
-% which caluclates the local entropy within that same size nhood. It helps
-% considerably and in most cases should be included
-
-
-try tf = islogical(varargin{1});
-if tf
-    texture_y_n = varargin{1}; end
-catch
-    texture_y_n = 0;
-end
+% segmentation the RGB channels of the RGB colorspace, local entropy, 
+% and local variance. we make use of the IMSEGKMEANS powerful abiliity 
+% to handle any amount of channels, and that generally speaking,
+% more information is only going to faciltate segmentation.
+% We then use a (perhaps overkill) tristimulus vector distance method of identifying which
+% color label is background and which is foreground. 
 
 matrxBlur = [0 -1 0; -1 5 -1; 0 -1 0;]; %edge preserving (I think) kernel, blur fast.
 rgbBlurred = imfilter(imgCurrent, matrxBlur, 'symmetric', 'conv');
 
-labCurrent= rgb2lab(rgbBlurred);
-ab1  = labCurrent(:,:,2)  ; ab2  = labCurrent(:,:,3); %ignore luminosity, just focusing on color
-chl1 = im2single(ab1)     ; chl2 = im2single(ab2)   ;
-
-if ceil(mean(chl1(2:5,2:5), 'all'))==1 %check in the top left corner and see if its more or less white or black. flip if white
-    chl1 = imcomplement(chl1); end
-if ceil(mean(chl2(2:5,2:5), 'all'))==1
-    chl2 = imcomplement(chl2); end
-
-if texture_y_n
-    Eim = im2single(entropyfilt(imgCurrent));
-    Sim = im2single(stdfilt(imgCurrent,ones(9)));
-    MedFilt = im2single(ordfilt2(imlocalbrighten(Eim), 13, [5, 5]));
-    chls = cat(3, chl1, chl2, Eim, Sim, MedFilt);
-elseif texture_y_n == 0
-    chls = cat(3, chl1, chl2);
-end
+Eim = rescale(im2single(cat(3, entropyfilt(imgCurrent(:,:,1)),entropyfilt(imgCurrent(:,:,2)),entropyfilt(imgCurrent(:,:,3)))),0,1);
+Sim = im2single(cat(3, stdfilt(imgCurrent(:,:,1),ones(9)),stdfilt(imgCurrent(:,:,2),ones(9)),stdfilt(imgCurrent(:,:,3),ones(9))));
+MedFilt = cat(3, medfilt2(imlocalbrighten(Eim(:,:,1)), [7, 7]), medfilt2(imlocalbrighten(Eim(:,:,2)), [7, 7]), medfilt2(imlocalbrighten(Eim(:,:,3)), [7, 7]));
+    
+chls = cat(3, rgbBlurred, Eim, rescale(Sim, 0,1), MedFilt);
 
 numColors = 2;
 
 LABELED = imsegkmeans(chls,numColors, 'Threshold', 1e-3); %the core of this function is the built in imsegkmeans
+LABELEDrgb = im2double(label2rgb(LABELED));
+outercolor = squeeze(mean(LABELEDrgb(2:8,2:5,:), [1,2])); 
+    
+nRows = size(imgCurrent,1); nCols = size(imgCurrent,2);
+nPxls = prod(size(imgCurrent,1:2));
+rgbStack = reshape(LABELEDrgb, nPxls, 3);
 
-labelVals = unique(LABELED); %these will be the two colors of the labeled image, I think always its =1 or 2
-zerocolor = round(mean(LABELED(2:10,2:5), 'all')); %its random if the foreground or background is set to 1 or 2...
-maskColor = labelVals(labelVals~=zerocolor);
+% Ensure that this is a row vector.
+avgColor_vec = outercolor(:)'; 
 
-LABELED(LABELED==maskColor) = 5;
-LABELED(LABELED==zerocolor) = 0;
-maskBW = im2double(LABELED)./5;
+% Compute the Euclidean distance between all rows of image and avgColor_vec. 
+Dis = sqrt(sum((rgbStack - avgColor_vec(ones(nPxls,1),:)).^2, 2));
 
-se = strel('disk', 7, 8);
+% Initialize I as a column vector.
+Im = true(nPxls,1); 
 
-BW      = imopen(maskBW, se);
-outMask = imfill(imcomplement(BW), 'holes');
-outMask = logical(outMask);
+% Set to 1 the locations in I at which D <= Thresh. 
+Im(Dis <= 0.1) = false;
 
+% Reshape I into an M-by-N image and fill in any holes
+finalOutMask = imfill(reshape(Im,nRows,nCols), 'holes'); 
 
+end

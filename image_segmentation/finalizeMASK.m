@@ -98,12 +98,8 @@ while true
         % - 'not done! save and quit' is selected  off the list
         close all force
         
-        %recreate the figure
-        fig3 = uifigure('CloseRequestFcn',@guiCloseFuntion);  
-        axy3 = axes(fig3);
-        
-        imshow(imAdjRGB,'Parent',axy3, 'Border', 'tight');
-        visboundaries(axy3, binaryMask, 'Color', 'r');
+       error('program closed without saving')
+
     end
 end
 
@@ -185,7 +181,7 @@ switch choice
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     case 'k means color clustering segmentation' 
-        outOfBoundsMask = k_means_seg_2colors(imgCurrent,true);
+        outOfBoundsMask = k_means_seg_2colors(imgCurrent);
         outOfBoundsMask = cleanMask(outOfBoundsMask);
         
     % case 'Texture segmentation Gabor+LBP, then FCM'

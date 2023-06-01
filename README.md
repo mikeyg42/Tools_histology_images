@@ -16,7 +16,12 @@ The first, and more thoroughly tested/annotated, is a library of tools for the s
 - your images should have foregrounds of darker-colored blobs surrounded on all sides by background 
 - the images are fairly big and high-resolution (my tiff files that I've been testing with range from 0.5 to 10 gigabytes in size). 
 
-<p>First and foremost this repository is an exploratory tool. This is because instead of having just 1 segmentation strategy, I've included a menu of 8 different segmentation algorithms you can try out. It also includes 6 different "refinement" algorithms to improve a segmentation. Because consistency and reproducibility are super important in science, and are inherently at odds with this kind of "a la carte" approach, the suggested usage of this tool is to first determine what approach is best-suited to your data. After you've determined that, every image should be segmented the same way. <p>
+<p>First and foremost this repository is an exploratory tool. This is because instead of having just 1 segmentation strategy, included:
+- 8 different segmentation algorithms. 
+- 6 different "refinement" algorithms to tweak imperfect segmentation towards a more precise solution. 
+
+- Emphasizes the importance of consistency and reproducibility in scientific research
+- Use this toolm as a means of exploring your image set. 
 </details>
 
 <details id=2>

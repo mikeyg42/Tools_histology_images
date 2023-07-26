@@ -3,9 +3,9 @@
   
 <p>Welcome to my repo! This page contains some MATLAB code I've written over the past few years to solve various image processing problems I encountered as a technician working in various molecular neuroscience labs. <p>
 
-<p>Finding myself with a rare bit of free time, I’ve cleaned up and consolidated much of the code I’ve written in MATLAB to process images. My hope is that someone will stumble upon this repository and find within the various tools enclosed that there lies the exact thing that they had been looking for. <p> 
+<p>I’ve cleaned up and consolidated much of the code I’ve written in MATLAB to process images. My hope is that someone will stumble upon this repository and find within the various tools enclosed that there lies the exact thing that they had been looking for. <p> 
 
-<p> I’ve opted to focus this repository on a particular type of medical histology image, namely  brightfield whole-slide images (WSI) of chromogenic immunohistochemistry (IHC). I’ve chosen this dataset mostly because I have access to a huge number of these images. The reason that I have such a large dataset in the first place is that WSI is incredible and by closing the pernicious gap between micro-, meso-, and macroscopic level observations, which has always encumbered microscopy studies, stands to radically redefine the way microscopy data is used in research and pathology. For that reason by the end of the time at my previous job I exclusively imaged in this way. I also will note that I focused on IHC  because it has been a recurrent frustration how much of the field of medical imaging is focused on H&E staining, which is not a particularly useful stain for researchers, and so hope I may be able to fill some gaps here. <p>
+<p> I’ve opted to focus this on a particular type of medical histology image, namely  brightfield whole-slide images (WSI) of chromogenic immunohistochemistry (IHC). I’ve chosen this dataset in part because I have access to a huge number of these images. I also will note that I focused on IHC  because it has been a recurrent frustration of mine that so much of the field of medical imaging is focused on H&E staining, which is not a particularly useful stain for researchers, and so hope I may be able to fill some gaps here. <p>
 
 </details>
 

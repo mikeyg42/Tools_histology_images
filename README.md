@@ -1,7 +1,7 @@
 # Image Processing Tools for Whole Slide Images of Brightfield Histology
 <p>% ----------------------------------------------------%<p>
   
-<p>Welcome to my repo! This page contains some MATLAB code I've written over the past few years to solve various image processing problems I encountered as a technician working in various molecular neuroscience labs. <p>
+<p>Welcome to my MATLAB repo! This page contains some ofn the MATLAB code I've written to solve various image processing problems. Most of these problems I encountered as a technician working in various molecular neuroscience labs. <p>
 
 <p>I’ve cleaned up and consolidated much of the code I’ve written in MATLAB to process images. My hope is that someone will stumble upon this repository and find within the various tools enclosed that there lies the exact thing that they had been looking for. <p> 
 
@@ -12,17 +12,17 @@
 <details id=1>
 <summary><h2> IMAGE SEGMENTATION </h2></summary>
  
-The first, and more thoroughly tested/annotated, is a library of tools for the semi-automated foreground/background segmentation of large, brightfield whole-slide images. As long as your images hold the following attributes, this tool should be well-suited to your workflow:
-- your images are in RGB format. MATLAB has a nice library of color space conversion functions if youre images are described in another color space. If you have only grayscale images though, you will need to rewrite some code or devise a creative work-around.
-- your images should have foregrounds of darker-colored blobs surrounded on all sides by background 
-- the images are fairly big and high-resolution (my tiff files that I've been testing with range from 0.5 to 10 gigabytes in size). 
+The first, and more (relativelys speaking) tested/annotated, is a library of tools for the semi-automated foreground/background segmentation. In particular, this is built for large, brightfield images, such as whole-slide images. As long as your images hold the following attributes, this tool should be well-suited to your workflow:
+- your images are in RGB format. Grayscale images can just be tripled up often as a work around.
+- your images should have foregrounds of darker-colored blobs surrounded on all sides by background. just invert if you dont have this.
+- the images are fairly big and high-resolution (my tiff files are within range of 0.5 to 15 gigabytes in size). 
 
 <p>First and foremost this repository is an exploratory tool. This is because instead of having just 1 segmentation strategy, included:
 - 8 different segmentation algorithms. 
 - 6 different "refinement" algorithms to tweak imperfect segmentation towards a more precise solution. 
 
 - Emphasizes the importance of consistency and reproducibility in scientific research
-- Use this toolm as a means of exploring your image set. 
+- Use this tool as a means of exploring your image set. 
 </details>
 
 <details id=2>
